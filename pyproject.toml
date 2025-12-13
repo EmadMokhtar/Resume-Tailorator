@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aiofiles>=25.1.0",
     "html2text>=2025.4.15",
     "playwright>=1.56.0",
     "pydantic-ai>=1.24.0",

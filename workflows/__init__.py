@@ -6,6 +6,7 @@ from workflows.agents import (
     writer_agent,
     auditor_agent,
     resume_parser_agent,
+    reviewer_agent,
 )
 from models.agents.output import JobAnalysis, CV
 from models.workflow import ResumeTailorResult
@@ -13,11 +14,15 @@ from models.workflow import ResumeTailorResult
 
 class ResumeTailorWorkflow:
     MAX_RETRIES = 3
+    max_review_iterations = 3
+    max_write_attempts = 3
 
     def __init__(self):
         pass
 
-    async def run(self, resume_text: str, job_url: str) -> ResumeTailorResult:
+    async def run(
+        self, resume_text: str, job_content_file_path: str
+    ) -> ResumeTailorResult:
         print("🚀 STARTING MULTI-AGENT PIPELINE\n")
 
         # --- STEP 0: PARSE ORIGINAL RESUME ---
@@ -65,7 +70,7 @@ class ResumeTailorWorkflow:
         for attempt in range(self.MAX_RETRIES):
             try:
                 job_analysis_result = await analyst_agent.run(
-                    f"Analyze the job posting at this URL: {job_url}"
+                    f"Analyze the job content located at this file path {job_content_file_path} and extract structured job data.",
                 )
 
                 print(f"   [Debug] Job Data: {job_analysis_result.output}")
@@ -102,11 +107,10 @@ class ResumeTailorWorkflow:
         job_data_json = job_analysis_result.output.model_dump_json()
 
         # --- STEP 2: WRITE CV (Agent 2) with AUDIT LOOP ---
-        max_write_attempts = 3
         new_cv = None
         audit = None
 
-        for write_attempt in range(max_write_attempts):
+        for write_attempt in range(self.max_write_attempts):
             print(
                 f"🤖 Agent 2 (Writer): Tailoring CV (Attempt {write_attempt + 1}/{max_write_attempts})..."
             )
@@ -159,8 +163,9 @@ Rewrite the CV to match the Job Analysis while addressing all audit feedback.
 
             new_cv = writer_result.output or None
             if new_cv is None:
-                if write_attempt == max_write_attempts - 1:
+                if write_attempt == self.max_write_attempts - 1:
                     return ResumeTailorResult(
+                        company_name="",
                         tailored_resume="",
                         audit_report={},
                         passed=False,
@@ -168,6 +173,84 @@ Rewrite the CV to match the Job Analysis while addressing all audit feedback.
                 continue
 
             print(f"   ✅ CV Drafted. Summary: {new_cv.summary[:100]}...\n")
+
+            # --- STEP 2.5: QUALITY REVIEW (Agent 2.5) ---
+            for review_iteration in range(self.max_review_iterations):
+                print(
+                    f"🤖 Agent 2.5 (Reviewer): Checking CV quality (Iteration {review_iteration + 1}/{self.max_review_iterations})..."
+                )
+
+                review_prompt = f"""
+Review this CV against job requirements:
+
+CV: {new_cv.model_dump_json() if hasattr(new_cv, "model_dump_json") else str(new_cv)}
+Job Analysis: {job_data_json}
+
+Assess quality and suggest improvements if needed.
+"""
+
+                try:
+                    review_result = await reviewer_agent.run(review_prompt)
+                    review = review_result.output
+
+                    if review is None:
+                        print("   ⚠️ Review returned None, skipping quality check\n")
+                        break
+
+                    print(f"   📊 Quality Score: {review.quality_score}/10")
+
+                    if review.strengths:
+                        print(f"   ✨ Strengths: {', '.join(review.strengths[:2])}")
+
+                    if (
+                        review.needs_improvement
+                        and review_iteration < self.max_review_iterations - 1
+                    ):
+                        print("   🔄 Quality improvements needed, refining...\n")
+
+                        # Prepare suggestions text
+                        suggestions_text = "\n".join(
+                            f"- {s}" for s in review.specific_suggestions
+                        )
+
+                        # Refine CV based on review
+                        improvement_prompt = f"""
+Improve this CV based on reviewer feedback:
+
+Current CV: {new_cv.model_dump_json() if hasattr(new_cv, "model_dump_json") else str(new_cv)}
+Original CV: {original_cv_json}
+Job Analysis: {job_data_json}
+
+Specific improvements to address:
+{suggestions_text}
+
+CRITICAL RULES:
+1. ONLY use information from the Original CV - DO NOT add new skills or experiences
+2. Apply the suggestions to improve quality and relevance
+3. Maintain accuracy and honesty
+4. Use natural language, avoid AI clichés
+5. Keep all dates and facts accurate
+
+Focus on better highlighting relevant experience and incorporating job keywords naturally.
+"""
+
+                        refined_result = await writer_agent.run(improvement_prompt)
+                        if refined_result.output:
+                            new_cv = refined_result.output
+                            print("   ✅ CV refined based on feedback\n")
+                        else:
+                            print("   ⚠️ Refinement returned None, keeping current CV\n")
+                            break
+                    else:
+                        if review.needs_improvement:
+                            print("   ℹ️ Max review iterations reached\n")
+                        else:
+                            print("   ✅ Quality check passed!\n")
+                        break
+
+                except Exception as e:
+                    print(f"   ⚠️ Review failed: {e}, continuing with current CV\n")
+                    break
 
             # For auditor prompt, prepare serializations
             new_cv_json = (
@@ -200,7 +283,7 @@ Compare the two structured CVs carefully. Ensure that:
             audit = audit_result.output
             if audit is None:
                 print(f"   ⚠️ Audit result is None on attempt {write_attempt + 1}")
-                if write_attempt < max_write_attempts - 1:
+                if write_attempt < self.max_write_attempts - 1:
                     print("   🔄 Will retry...\n")
                     continue
                 else:
@@ -223,6 +306,7 @@ Compare the two structured CVs carefully. Ensure that:
             if passed:
                 print(f"   ✅ Audit passed on attempt {write_attempt + 1}!\n")
                 return ResumeTailorResult(
+                    company_name=job_analysis_result.output.company_name,
                     tailored_resume=new_cv.model_dump_json()
                     if new_cv and hasattr(new_cv, "model_dump_json")
                     else str(new_cv),
@@ -246,7 +330,7 @@ Compare the two structured CVs carefully. Ensure that:
                 )
             else:
                 print(f"   ⚠️ Audit failed on attempt {write_attempt + 1}")
-                if write_attempt < max_write_attempts - 1:
+                if write_attempt < self.max_write_attempts - 1:
                     print("   🔄 Will retry with feedback...\n")
                 else:
                     print("   ❌ Max attempts reached\n")
@@ -260,6 +344,7 @@ Compare the two structured CVs carefully. Ensure that:
         if audit is None:
             print("⚠️ Warning: No audit result available")
             return ResumeTailorResult(
+                company_name=job_analysis_result.output.company_name,
                 tailored_resume="",
                 audit_report={
                     "passed": False,
@@ -292,6 +377,7 @@ Compare the two structured CVs carefully. Ensure that:
 
         # Return final result (even if audit failed)
         return ResumeTailorResult(
+            company_name=job_analysis_result.output.company_name,
             tailored_resume=new_cv.model_dump_json()
             if new_cv and hasattr(new_cv, "model_dump_json")
             else str(new_cv)

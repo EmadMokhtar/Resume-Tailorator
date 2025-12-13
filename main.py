@@ -1,15 +1,15 @@
 import asyncio
 import os
 
-
 from workflows import ResumeTailorWorkflow
 
 
 async def main():
     # --- Inputs ---
-    # TODO: Pass the job URL as CLI argument.
-    job_url = "<JOB_URL_PLACEHOLDER>"
-    resume_file_path = os.path.join(os.getcwd(), "resume.md")
+    # TODO: Pass the job file content path as CLI argument.
+    files_path = os.path.join(os.getcwd(), "files")
+    job_content_file_path = os.path.join(files_path, "job_posting.md")
+    resume_file_path = os.path.join(files_path, "resume.md")
     original_cv_text: str = ""
 
     # Reading the original CV from the file
@@ -29,12 +29,16 @@ async def main():
 
     # Run the workflow
     workflow = ResumeTailorWorkflow()
-    result = await workflow.run(original_cv_text, job_url)
+    result = await workflow.run(
+        original_cv_text, job_content_file_path=job_content_file_path
+    )
 
     # If passed, save the file
     if result.passed:
         print("\n✅ Audit Passed. Saving CV...")
-        output_path = os.path.join(os.getcwd(), "tailored_resume.md")
+        output_path = os.path.join(
+            files_path, f"tailored_resume_{result.company_name}.md"
+        )
 
         # Parse the CV JSON back to CV object
         import json

@@ -57,3 +57,21 @@ class AuditResult(BaseModel):
     ai_cliche_score: int = Field(description="0-10. 10 means it sounds very robotic.")
     issues: list[AuditIssue]
     feedback_summary: str
+
+
+class CoverLetter(BaseModel):
+    content: str
+    word_count: int
+
+
+class ReviewResult(BaseModel):
+    quality_score: int = Field(..., ge=0, le=10, description="Overall quality score")
+    needs_improvement: bool = Field(
+        ..., description="Whether another iteration is needed"
+    )
+    specific_suggestions: list[str] = Field(
+        default_factory=list, description="Actionable improvements"
+    )
+    strengths: list[str] = Field(
+        default_factory=list, description="What's working well"
+    )
