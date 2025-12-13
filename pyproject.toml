@@ -7,6 +7,8 @@ requires-python = ">=3.13"
 dependencies = [
     "aiofiles>=25.1.0",
     "html2text>=2025.4.15",
+    "markdown>=3.10",
+    "markdown-pdf>=1.10",
     "playwright>=1.56.0",
     "pydantic-ai>=1.24.0",
 ]

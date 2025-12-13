@@ -190,3 +190,4 @@ cython_debug/
 
 # The tailored resume markdown
 files/tailored_resume_*.md
+files/tailored_resume_*.pdf

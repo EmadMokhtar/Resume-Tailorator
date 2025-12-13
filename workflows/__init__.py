@@ -112,7 +112,7 @@ class ResumeTailorWorkflow:
 
         for write_attempt in range(self.max_write_attempts):
             print(
-                f"🤖 Agent 2 (Writer): Tailoring CV (Attempt {write_attempt + 1}/{max_write_attempts})..."
+                f"🤖 Agent 2 (Writer): Tailoring CV (Attempt {write_attempt + 1}/{self.max_write_attempts})..."
             )
             if write_attempt == 0:
                 print(f"   [Debug] Original CV has {len(original_cv.skills)} skills")
@@ -290,6 +290,7 @@ Compare the two structured CVs carefully. Ensure that:
                     print("   ❌ Max attempts reached\n")
                     # Return failure result
                     return ResumeTailorResult(
+                        company_name="",
                         tailored_resume="",
                         audit_report={
                             "passed": False,
