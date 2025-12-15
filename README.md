@@ -1,5 +1,7 @@
 #  📄 Resume Tailorator
 
+![cover](./cover.png)
+
 Resume Tailorator is a sophisticated multi-agent AI system designed to analyze job postings and tailor your resume to match specific job requirements. It ensures authenticity, avoids AI clichés, and optimizes for Applicant Tracking Systems (ATS).
 
 ## 🚀 Features
