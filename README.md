@@ -1,175 +1,107 @@
-# AI-Powered Resume Tailoring System
+#  📄 Resume Tailorator
 
-A multi-agent AI system that automatically analyzes job postings and tailors your resume to match specific job requirements while maintaining accuracy and avoiding AI-generated clichés.
+Resume Tailorator is a sophisticated multi-agent AI system designed to analyze job postings and tailor your resume to match specific job requirements. It ensures authenticity, avoids AI clichés, and optimizes for Applicant Tracking Systems (ATS).
 
-## Overview
+## 🚀 Features
 
-This project uses a pipeline of specialized AI agents to:
-1. **Scrape & Analyze** job postings to extract key requirements
-2. **Rewrite** your resume to target those requirements
-3. **Audit** the generated resume for hallucinations and AI-speak
-4. **Validate** that no false claims were added
+- **Multi-Agent Architecture**: Uses specialized agents for analyzing, writing, and auditing.
+- **Automated Job Analysis**: Extracts key requirements and skills from job postings.
+- **Authentic Tailoring**: Rephrases your experience to match the job without inventing skills.
+- **Hallucination & Cliché Detection**: Built-in auditor to ensure quality and "human" tone.
+- **Dual Output**: Generates both Markdown (`.md`) and PDF (`.pdf`) versions of the tailored resume.
+- **Input Validation**: Ensures your input files are correctly formatted before processing.
+- **Self-Correcting Workflow**: The writer agent iterates based on feedback from the auditor.
 
-## Features
+## 🛠️ Architecture
 
-- 🕷️ **Automated Job Scraping** - Uses Playwright to fetch job posting content
-- 🧠 **Multi-Agent Architecture** - Specialized agents for analysis, writing, and auditing
-- 🎯 **ATS Optimization** - Identifies and targets keywords for Applicant Tracking Systems
-- ✅ **Hallucination Detection** - Ensures no fake skills or experience are added
-- 🚫 **AI Cliché Filter** - Detects and removes robotic AI-generated language
-- 🔄 **Automatic Retries** - Built-in retry logic for reliability
-- 🔁 **Self-Correcting Loop** - Writer automatically fixes issues based on auditor feedback (up to 3 attempts)
+The system employs a sequential pipeline of AI agents:
 
-## Architecture
+1.  **Analyst Agent**: Extracts structured job requirements.
+2.  **Resume Parser Agent**: Parses your Markdown resume into structured data.
+3.  **Writer Agent**: Tailors the CV to match job requirements.
+4.  **Auditor Agent**: Validates for hallucinations and AI clichés.
+5.  **Reviewer Agent**: Provides quality feedback.
 
-The system uses 3 specialized AI agents:
+## 📋 Prerequisites
 
-1. **Analyst Agent** - Extracts structured data from job postings
-2. **Writer Agent** - Tailors your resume to match job requirements
-3. **Auditor Agent** - Validates accuracy and quality
+- **Python 3.13+**
+- **[uv](https://github.com/astral-sh/uv)** (Fast Python package installer and resolver)
+- **OpenAI API Key** (or compatible LLM provider configured in environment)
 
-## Requirements
+## 📦 Installation
 
-- Python 3.8+
-- Playwright (for web scraping)
-- Ollama (running locally with `gpt-oss:20b` model)
-- Pydantic AI
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/EmadMokhtar/resume_tailorator
+    cd resume_tailorator
+    ```
 
-## Installation
+2.  **Install dependencies**:
+    This project uses `uv` for dependency management.
+    ```bash
+    uv sync
+    ```
 
-```bash
-# Install dependencies
-pip install pydantic-ai playwright html2text
+3.  **Set up Environment Variables**:
+    Export your OpenAI API key (or other provider keys):
+    ```bash
+    export OPENAI_API_KEY=your_api_key_here
+    ```
 
-# Install Playwright browsers
-playwright install chromium
-```
+## 🏃 Usage
 
-## Usage
+1.  **Prepare Input Files**:
+    Navigate to the `files/` directory and update the following files:
+    *   `resume.md`: Paste your current resume in Markdown format.
+    *   `job_posting.md`: Paste the job description you want to apply for.
 
-1. **Prepare your resume** as `resume.md` in Markdown format
+    *Note: Do not leave the default placeholder text in these files.*
 
-2. **Update the job URL** in `main.py`:
-   ```python
-   job_url = "https://example.com/job-posting"
-   ```
+2.  **Run the Application**:
+    Use the Makefile command to validate inputs and run the workflow:
+    ```bash
+    make run
+    ```
 
-3. **Run the pipeline**:
-   ```bash
-   python main.py
-   ```
+3.  **View Results**:
+    Upon successful completion, the tailored resume will be saved in the `files/` directory:
+    *   `tailored_resume_<Company_Name>.md`
+    *   `tailored_resume_<Company_Name>.pdf`
 
-4. **Review the output**:
-   - Check the audit report in the console
-   - If passed, find your tailored resume in `tailored_resume.md`
+## 🛠️ Make Commands
 
-## Configuration
+This project uses a `Makefile` to simplify common tasks. Here are the available commands:
 
-### Model Selection
-Change the model by updating `MODLE_NAME`:
-```python
-MODLE_NAME = "ollama:gpt-oss:20b"  # Or any compatible model
-```
+| Command            | Description                                                     |
+|--------------------|-----------------------------------------------------------------|
+| `make help`        | Show available commands and descriptions.                       |
+| `make install`     | Install production dependencies using `uv`.                     |
+| `make install/dev` | Install development dependencies using `uv`.                    |
+| `make run`         | Validate inputs and run the resume tailorator workflow.         |
+| `make install/uv`  | Ensure `uv` is installed (automatically run by other commands). |
 
-### Retry Attempts
-Adjust retry behavior:
-```python
-MAX_RETRIES = 3  # Number of retry attempts
-```
-
-## Output Structure
-
-The generated resume includes:
-- **Summary** - Tailored to the job description
-- **Skills** - Highlighted relevant technical and soft skills
-- **Experience** - Rephrased to match job keywords
-- **Education** - Preserved from original resume
-
-## Audit System
-
-The auditor checks for:
-- **Hallucinations** (Score: 0-10) - Fabricated skills or experience
-- **AI Clichés** (Score: 0-10) - Robotic language patterns
-- **Critical Issues** - False claims that would disqualify the resume
-- **Minor Issues** - Style improvements
-
-### Feedback Loop
-
-If the audit fails, the system automatically:
-1. Extracts all issues and suggestions from the audit report
-2. Sends the feedback back to the writer agent
-3. Requests a corrected version with strict instructions to fix the issues
-4. Re-audits the new version
-5. Repeats up to 3 times until the CV passes or max attempts reached
-
-This ensures that common issues like:
-- Adding skills not in the original CV
-- Omitting important original skills
-- Missing job requirements
-- Using AI clichés
-
-...are automatically corrected without manual intervention.
-
-## Example Workflow
+## 📂 Project Structure
 
 ```
-🚀 STARTING MULTI-AGENT PIPELINE
-
-🤖 Agent 1 (Analyst): Reading job post...
-   [Tool] 🕷️ Scraping https://job-boards.greenhouse.io/...
-   ✅ Job Analyzed: Senior Backend Engineer at ClickHouse
-   🎯 Keywords found: ['Python', 'Kubernetes', 'Docker', ...]
-
-🤖 Agent 2 (Writer): Tailoring CV (Attempt 1/3)...
-   ✅ CV Drafted. Summary: Experienced backend engineer...
-
-🤖 Agent 3 (Auditor): Validating for hallucinations and AI-speak...
-   ⚠️ Audit failed on attempt 1
-   🔄 Will retry with feedback...
-
-🤖 Agent 2 (Writer): Tailoring CV (Attempt 2/3)...
-   🔄 Retrying with audit feedback...
-   ✅ CV Drafted. Summary: Backend engineer with expertise...
-
-🤖 Agent 3 (Auditor): Validating for hallucinations and AI-speak...
-   ✅ Audit passed on attempt 2!
-
-==============================
-📋 FINAL AUDIT REPORT
-==============================
-Passed: True
-Hallucination Score (0 is best): 0
-AI Cliché Score (0 is best): 2
-Feedback: Resume effectively targets job requirements...
-
-✅ Audit Passed. Saving CV...
+resume_tailorator/
+├── files/                  # Input and output files
+│   ├── resume.md           # Your source resume
+│   └── job_posting.md      # Target job description
+├── models/                 # Pydantic data models
+├── tools/                  # Helper tools (Playwright, etc.)
+├── utils/                  # Utilities (PDF generation, validation)
+├── workflows/              # Agent definitions and workflow logic
+├── main.py                 # Entry point
+├── Makefile                # Command shortcuts
+└── pyproject.toml          # Project configuration
 ```
 
-## Safety Features
+## 🛡️ Safety & Quality
 
-- ✅ Never invents experience or skills
-- ✅ Only rephrases existing content
-- ✅ Flags AI-generated language
-- ✅ Requires audit approval before saving
+- **Anti-Hallucination**: The system is strictly instructed never to invent skills or experiences.
+- **Cliché Filter**: Avoids terms like "spearheaded", "synergy", and "game-changer".
+- **Validation**: The `make run` command checks that your input files are not empty or containing default placeholders before starting the expensive AI process.
 
-## Limitations
+## 🤝 Contributing
 
-- Requires Ollama running locally
-- Limited to 20,000 characters of scraped content
-- May need manual review for complex job postings
-
-## Future Improvements
-
-- [ ] CLI argument support for job URL and resume path
-- [ ] Support for multiple LLM providers
-- [ ] PDF resume generation
-- [ ] Batch processing for multiple jobs
-- [ ] Web interface
-
-## License
-
-[Your License Here]
-
-## Contributing
-
-Contributions welcome! Please open an issue or PR.
+Contributions are welcome! Please ensure you follow the coding guidelines and add tests for new features.
