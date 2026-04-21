@@ -5,6 +5,8 @@ import json
 from pydantic import AwareDatetime, BaseModel, field_validator
 
 from models.agents.output import CV
+
+
 class ResumeMemoryError(Exception):
     """Base error for resume memory failures."""
 
@@ -23,13 +25,13 @@ class ResumeSourceRecord(BaseModel):
     last_seen_at: AwareDatetime
 
 
-
 class ParsedOriginalResumeRecord(BaseModel):
     """Represents a parsed original resume.
 
     This record is keyed one-to-one by source_id; it intentionally does not
     include a separate `id` field (the source_id is the effective primary key).
     """
+
     source_id: str
     content_hash: str
     parser_version: str
@@ -64,7 +66,9 @@ class TailoredResumeRecord(BaseModel):
         try:
             json.loads(v)
         except Exception as e:
-            raise ValueError("tailored_cv_json/audit_report_json must be valid JSON") from e
+            raise ValueError(
+                "tailored_cv_json/audit_report_json must be valid JSON"
+            ) from e
         return v
 
 

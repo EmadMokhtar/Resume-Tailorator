@@ -12,6 +12,7 @@ def block_model_requests() -> Generator[None, None, None]:
     with models.override_allow_model_requests(False):
         yield
 
+
 @pytest.fixture
 def sample_cv() -> CV:
     return CV(

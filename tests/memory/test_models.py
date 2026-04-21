@@ -44,7 +44,10 @@ def test_missing_original_resume_error_has_clear_message() -> None:
         "No stored original resume found. Provide --resume-path on the first run."
     )
 
-    assert str(error) == "No stored original resume found. Provide --resume-path on the first run."
+    assert (
+        str(error)
+        == "No stored original resume found. Provide --resume-path on the first run."
+    )
 
 
 def test_resume_memory_error_is_exported() -> None:
