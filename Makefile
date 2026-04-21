@@ -29,4 +29,5 @@ tests: test ## Alias for test
 
 run: install ## Run the resume tailorator agentic workflow
 	@echo "🚀 Running Resume Tailorator..."
+	@uv run python utils/validate_inputs.py
 	@uv run python main.py
