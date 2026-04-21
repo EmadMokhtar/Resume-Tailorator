@@ -2,16 +2,15 @@
 
 import pytest
 from pydantic_ai import models
+from collections.abc import Generator
 
 from models.agents.output import CV, WorkExperience
 
 
 @pytest.fixture(autouse=True, scope="session")
-def block_model_requests() -> None:
+def block_model_requests() -> Generator[None, None, None]:
     with models.override_allow_model_requests(False):
         yield
-
-
 
 @pytest.fixture
 def sample_cv() -> CV:
