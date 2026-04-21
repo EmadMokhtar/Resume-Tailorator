@@ -3,13 +3,11 @@
 import json
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, AwareDatetime
 
 from models.agents.output import CV
 
 
-# Alias used to indicate fields must be timezone-aware datetimes
-AwareDatetime = datetime
 
 
 class ResumeMemoryError(Exception):
@@ -29,15 +27,14 @@ class ResumeSourceRecord(BaseModel):
     updated_at: AwareDatetime
     last_seen_at: AwareDatetime
 
-    @field_validator("created_at", "updated_at", "last_seen_at", mode="after")
-    @classmethod
-    def _ensure_aware_datetimes(cls, v: datetime) -> datetime:
-        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
-            raise ValueError("datetime fields must be timezone-aware")
-        return v
 
 
 class ParsedOriginalResumeRecord(BaseModel):
+    """Represents a parsed original resume.
+
+    This record is keyed one-to-one by source_id; it intentionally does not
+    include a separate `id` field (the source_id is the effective primary key).
+    """
     source_id: str
     content_hash: str
     parser_version: str
@@ -52,13 +49,6 @@ class ParsedOriginalResumeRecord(BaseModel):
             json.loads(v)
         except Exception as e:
             raise ValueError("cv_json must be valid JSON") from e
-        return v
-
-    @field_validator("created_at", "updated_at", mode="after")
-    @classmethod
-    def _ensure_aware_datetimes(cls, v: datetime) -> datetime:
-        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
-            raise ValueError("datetime fields must be timezone-aware")
         return v
 
 
@@ -79,14 +69,7 @@ class TailoredResumeRecord(BaseModel):
         try:
             json.loads(v)
         except Exception as e:
-            raise ValueError("field must be valid JSON") from e
-        return v
-
-    @field_validator("created_at", "updated_at", mode="after")
-    @classmethod
-    def _ensure_aware_datetimes(cls, v: datetime) -> datetime:
-        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
-            raise ValueError("datetime fields must be timezone-aware")
+            raise ValueError("tailored_cv_json/audit_report_json must be valid JSON") from e
         return v
 
 
