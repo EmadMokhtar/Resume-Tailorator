@@ -2,18 +2,14 @@
 
 import pytest
 from pydantic_ai import models
-from typing import Iterator
 
 from models.agents.output import CV, WorkExperience
 
 
 @pytest.fixture(autouse=True, scope="session")
-def block_model_requests() -> Iterator[None]:
-    models.ALLOW_MODEL_REQUESTS = False
-    try:
+def block_model_requests() -> None:
+    with models.override_allow_model_requests(False):
         yield
-    finally:
-        models.ALLOW_MODEL_REQUESTS = True
 
 
 
