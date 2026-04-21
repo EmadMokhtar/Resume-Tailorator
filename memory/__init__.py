@@ -1,6 +1,7 @@
 """Memory subsystem exports."""
 
 from memory.models import (
+    ResumeMemoryError,
     MissingOriginalResumeError,
     ParsedOriginalResumeRecord,
     ResolvedOriginalResume,
@@ -10,6 +11,7 @@ from memory.models import (
 from memory.repository import ResumeMemoryRepository
 
 __all__ = [
+    "ResumeMemoryError",
     "MissingOriginalResumeError",
     "ParsedOriginalResumeRecord",
     "ResolvedOriginalResume",

@@ -1,10 +1,15 @@
 """Pydantic models for original and tailored resume memory."""
 
+import json
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from models.agents.output import CV
+
+
+# Alias used to indicate fields must be timezone-aware datetimes
+AwareDatetime = datetime
 
 
 class ResumeMemoryError(Exception):
@@ -20,9 +25,16 @@ class ResumeSourceRecord(BaseModel):
     path: str
     content_hash: str
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
-    last_seen_at: datetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    last_seen_at: AwareDatetime
+
+    @field_validator("created_at", "updated_at", "last_seen_at", mode="after")
+    @classmethod
+    def _ensure_aware_datetimes(cls, v: datetime) -> datetime:
+        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
+            raise ValueError("datetime fields must be timezone-aware")
+        return v
 
 
 class ParsedOriginalResumeRecord(BaseModel):
@@ -30,8 +42,24 @@ class ParsedOriginalResumeRecord(BaseModel):
     content_hash: str
     parser_version: str
     cv_json: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+    @field_validator("cv_json")
+    @classmethod
+    def _validate_cv_json(cls, v: str) -> str:
+        try:
+            json.loads(v)
+        except Exception as e:
+            raise ValueError("cv_json must be valid JSON") from e
+        return v
+
+    @field_validator("created_at", "updated_at", mode="after")
+    @classmethod
+    def _ensure_aware_datetimes(cls, v: datetime) -> datetime:
+        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
+            raise ValueError("datetime fields must be timezone-aware")
+        return v
 
 
 class TailoredResumeRecord(BaseModel):
@@ -42,8 +70,24 @@ class TailoredResumeRecord(BaseModel):
     job_title: str
     tailored_cv_json: str
     audit_report_json: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+    @field_validator("tailored_cv_json", "audit_report_json")
+    @classmethod
+    def _validate_json_strings(cls, v: str) -> str:
+        try:
+            json.loads(v)
+        except Exception as e:
+            raise ValueError("field must be valid JSON") from e
+        return v
+
+    @field_validator("created_at", "updated_at", mode="after")
+    @classmethod
+    def _ensure_aware_datetimes(cls, v: datetime) -> datetime:
+        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
+            raise ValueError("datetime fields must be timezone-aware")
+        return v
 
 
 class ResolvedOriginalResume(BaseModel):
