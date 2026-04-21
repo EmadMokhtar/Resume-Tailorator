@@ -1,15 +1,10 @@
 """Pydantic models for original and tailored resume memory."""
 
 import json
-from datetime import datetime
 
-from pydantic import BaseModel, field_validator, AwareDatetime
+from pydantic import AwareDatetime, BaseModel, field_validator
 
 from models.agents.output import CV
-
-
-
-
 class ResumeMemoryError(Exception):
     """Base error for resume memory failures."""
 
