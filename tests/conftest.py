@@ -11,11 +11,19 @@ if ROOT not in sys.path:
 
 import pytest
 from pydantic_ai import models
+from typing import Iterator
 
 from models.agents.output import CV, WorkExperience
 
 
-models.ALLOW_MODEL_REQUESTS = False
+@pytest.fixture(autouse=True, scope="session")
+def block_model_requests() -> Iterator[None]:
+    models.ALLOW_MODEL_REQUESTS = False
+    try:
+        yield
+    finally:
+        models.ALLOW_MODEL_REQUESTS = True
+
 
 
 @pytest.fixture
