@@ -1,12 +1,6 @@
 """Pytest configuration for Resume Tailorator."""
 
 import pytest
-import sys
-from pathlib import Path
-
-# Ensure the project root is on sys.path so tests can import local packages
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from pydantic_ai import models
 
 from models.agents.output import CV, WorkExperience

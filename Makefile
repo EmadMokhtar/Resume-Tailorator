@@ -1,4 +1,4 @@
-.PHONY: help install/uv install install/dev run
+.PHONY: help install/uv install install/dev test tests run
 
 help:  ## Show this help
 	@echo "🆘 Showing help"
