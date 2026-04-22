@@ -13,12 +13,12 @@ install/uv:  ## Ensure uv is installed: curl locally, pip in CI
 
 install: install/uv  ## Install deps (excluding dev) with uv
 	@echo "📦 Installing production dependencies"
-	@uv sync
+	@uv sync --no-dev
 	@echo "✅ Done"
 
 install/dev: install/uv  ## Install dev deps with uv
 	@echo "📦 Installing development dependencies"
-	@uv sync --dev
+	@uv sync
 	@echo "✅ Done"
 
 test: install/dev  ## Run tests
