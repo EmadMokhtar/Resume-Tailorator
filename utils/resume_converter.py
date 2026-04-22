@@ -24,7 +24,7 @@ class UnsupportedFormatError(ResumeConverterError):
 
 
 class ConversionFailedError(ResumeConverterError):
-    """Raised when markitdown fails to convert the file."""
+    """Raised when a file cannot be converted to the target format."""
 
 
 class EmptyConversionResultError(ResumeConverterError):
@@ -32,7 +32,7 @@ class EmptyConversionResultError(ResumeConverterError):
 
 
 class NoResumeFileFoundError(ResumeConverterError):
-    """Raised when auto-detection finds no resume file in files/."""
+    """Raised when auto-detection finds no supported resume file."""
 
 
 class OutputConversionFailedError(ResumeConverterError):
