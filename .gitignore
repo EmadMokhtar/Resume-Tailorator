@@ -193,3 +193,6 @@ files/tailored_resume_*.md
 files/tailored_resume_*.pdf
 files/resume.md
 files/job_posting.md
+files/resume_memory.sqlite3
+files/resume_memory.sqlite3-journal
+.worktrees/
