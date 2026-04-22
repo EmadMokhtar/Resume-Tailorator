@@ -1,10 +1,16 @@
 """Pytest configuration for Resume Tailorator."""
 
-import pytest
-from pydantic_ai import models
+import os
 from collections.abc import Generator
 
+import pytest
+from pydantic_ai import models
+
 from models.agents.output import CV, WorkExperience
+
+# Provide a dummy key so pydantic-ai agent constructors don't fail at import time.
+# Real calls are blocked by the block_model_requests fixture below.
+os.environ.setdefault("OPENAI_API_KEY", "test-dummy-key-for-pytest")
 
 
 @pytest.fixture(autouse=True, scope="session")

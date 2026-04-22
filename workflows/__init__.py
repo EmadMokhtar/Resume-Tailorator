@@ -1,11 +1,9 @@
-import sys
 from pydantic_ai import AgentRunResult
 
 from workflows.agents import (
     analyst_agent,
     writer_agent,
     auditor_agent,
-    resume_parser_agent,
     reviewer_agent,
 )
 from models.agents.output import JobAnalysis, CV
@@ -21,42 +19,11 @@ class ResumeTailorWorkflow:
         pass
 
     async def run(
-        self, resume_text: str, job_content_file_path: str
+        self, original_cv: CV, job_content_file_path: str
     ) -> ResumeTailorResult:
         print("🚀 STARTING MULTI-AGENT PIPELINE\n")
 
-        # --- STEP 0: PARSE ORIGINAL RESUME ---
-        print("🤖 Agent 0 (Parser): Parsing original resume...")
-        original_cv_result: AgentRunResult[CV] | None = None
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                original_cv_result = await resume_parser_agent.run(
-                    f"Parse this resume into structured format:\n\n{resume_text}"
-                )
-
-                if original_cv_result.output is None:
-                    raise ValueError("Resume parsing returned None")
-
-                if (
-                    original_cv_result.output.full_name
-                    and original_cv_result.output.experience
-                ):
-                    break  # Success
-
-                print(
-                    f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete resume parse, retrying..."
-                )
-
-            except Exception as e:
-                print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
-                if attempt == self.MAX_RETRIES - 1:
-                    sys.exit("❌ Failed to parse original resume after retries.")
-
-        if original_cv_result is None or original_cv_result.output is None:
-            sys.exit("❌ Failed to parse original resume after retries.")
-
-        original_cv = original_cv_result.output
-        print(f"   ✅ Resume Parsed: {original_cv.full_name}")
+        print(f"   ✅ Resume Loaded From Memory: {original_cv.full_name}")
         print(
             f"   📋 Found {len(original_cv.skills)} skills, {len(original_cv.experience)} work experiences\n"
         )
@@ -91,10 +58,12 @@ class ResumeTailorWorkflow:
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
                 if attempt == self.MAX_RETRIES - 1:
-                    sys.exit("❌ Failed to get complete job analysis after retries.")
+                    raise RuntimeError(
+                        "Failed to get complete job analysis after retries."
+                    )
 
         if job_analysis_result is None or job_analysis_result.output is None:
-            sys.exit("❌ Failed to get complete job analysis after retries.")
+            raise RuntimeError("Failed to get complete job analysis after retries.")
 
         print(
             f"   ✅ Job Analyzed: {job_analysis_result.output.job_title} at {job_analysis_result.output.company_name}"
@@ -166,6 +135,7 @@ Rewrite the CV to match the Job Analysis while addressing all audit feedback.
                 if write_attempt == self.max_write_attempts - 1:
                     return ResumeTailorResult(
                         company_name="",
+                        job_title="",
                         tailored_resume="",
                         audit_report={},
                         passed=False,
@@ -291,6 +261,7 @@ Compare the two structured CVs carefully. Ensure that:
                     # Return failure result
                     return ResumeTailorResult(
                         company_name="",
+                        job_title="",
                         tailored_resume="",
                         audit_report={
                             "passed": False,
@@ -308,6 +279,7 @@ Compare the two structured CVs carefully. Ensure that:
                 print(f"   ✅ Audit passed on attempt {write_attempt + 1}!\n")
                 return ResumeTailorResult(
                     company_name=job_analysis_result.output.company_name,
+                    job_title=job_analysis_result.output.job_title,
                     tailored_resume=new_cv.model_dump_json()
                     if new_cv and hasattr(new_cv, "model_dump_json")
                     else str(new_cv),
@@ -346,6 +318,7 @@ Compare the two structured CVs carefully. Ensure that:
             print("⚠️ Warning: No audit result available")
             return ResumeTailorResult(
                 company_name=job_analysis_result.output.company_name,
+                job_title=job_analysis_result.output.job_title,
                 tailored_resume="",
                 audit_report={
                     "passed": False,
@@ -379,6 +352,7 @@ Compare the two structured CVs carefully. Ensure that:
         # Return final result (even if audit failed)
         return ResumeTailorResult(
             company_name=job_analysis_result.output.company_name,
+            job_title=job_analysis_result.output.job_title,
             tailored_resume=new_cv.model_dump_json()
             if new_cv and hasattr(new_cv, "model_dump_json")
             else str(new_cv)

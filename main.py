@@ -28,6 +28,15 @@ async def main():
 
     # Run the workflow
     workflow = ResumeTailorWorkflow()
+    # Task 6 will replace the legacy text-based flow below with:
+    # 1. ResumeMemoryService.resolve_original_resume(...)
+    # 2. workflow.run(resolved_original.cv, ...)
+    # Until then, fail fast with an actionable message rather than silently
+    # passing a raw string into workflow.run().
+    raise NotImplementedError(
+        "Task 6 not yet implemented: the memory service must parse 'original_cv_text' "
+        "into a CV object before calling workflow.run().  Wire up Task 6 first."
+    )
     result = await workflow.run(
         original_cv_text, job_content_file_path=job_content_file_path
     )
