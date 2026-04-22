@@ -296,6 +296,32 @@ async def test_main_file_not_found_exits_cleanly(tmp_path, monkeypatch, capsys) 
     assert "⚠️" in output or "not found" in output.lower()
 
 
+async def test_main_resume_resolution_failure_exits_cleanly(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """Domain errors during original resume resolution must be user-facing."""
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    (files_dir / "job_posting.md").write_text("# Engineer\nPython.")
+
+    monkeypatch.chdir(tmp_path)
+
+    patches, mocks = _patch_all(
+        resolved=_make_resolved(),
+        workflow_result=_make_result(),
+        resolve_side_effect=ResumeMemoryError("corrupted cached CV"),
+    )
+
+    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        with pytest.raises(SystemExit) as exc_info:
+            await main_module.main(argv=[])
+
+    assert exc_info.value.code == 1
+    output = capsys.readouterr().out
+    assert "failed to resolve original resume" in output.lower()
+    mocks["workflow"].run.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # Test 5: result.passed=False → save_tailored_resume NOT called
 # ---------------------------------------------------------------------------

@@ -73,6 +73,9 @@ async def main(argv: list[str] | None = None) -> None:
         except FileNotFoundError as exc:
             print(f"⚠️ Resume file not found: {exc}")
             sys.exit(1)
+        except (ResumeMemoryError, ValidationError, sqlite3.Error) as exc:
+            print(f"⚠️ Failed to resolve original resume: {exc}")
+            sys.exit(1)
 
         # --- Run the tailoring workflow ---
         workflow = ResumeTailorWorkflow()

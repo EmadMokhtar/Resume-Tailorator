@@ -14,8 +14,11 @@ real files or model calls.
 import hashlib
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from memory.models import (
     MissingOriginalResumeError,
+    ResumeMemoryError,
     ResolvedOriginalResume,
     TailoredResumeRecord,
 )
@@ -88,6 +91,8 @@ class ResumeMemoryService:
                 resume has been stored yet.
             FileNotFoundError: When the resolved file path does not exist on
                 disk.
+            ResumeMemoryError: When cached resume data is corrupted or parsing
+                the original resume fails.
         """
         # ---- Step 1: Determine file path and read content ---------------
         if path is not None:
@@ -121,10 +126,22 @@ class ResumeMemoryService:
             and parsed_record.parser_version == current_parser_version
         ):
             # Cache hit — deserialise stored JSON back into a CV model.
-            cv = CV.model_validate_json(parsed_record.cv_json)
+            try:
+                cv = CV.model_validate_json(parsed_record.cv_json)
+            except ValidationError as exc:
+                raise ResumeMemoryError(
+                    "Failed to load stored parsed resume. Re-import the original "
+                    "resume with --resume-path."
+                ) from exc
         else:
             # Cache miss — parse and persist.
-            cv = self._parser.parse(content)
+            try:
+                cv = self._parser.parse(content)
+            except (ResumeMemoryError, TypeError, ValueError) as exc:
+                raise ResumeMemoryError(
+                    "Failed to parse the original resume. Check the resume content "
+                    "and try again."
+                ) from exc
             self._repo.save_parsed_original_resume(
                 source_id=source.id,
                 content_hash=content_hash,

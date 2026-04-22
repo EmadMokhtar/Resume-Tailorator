@@ -18,9 +18,11 @@ Design overview:
 
 import json
 import os
+import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -31,7 +33,7 @@ from memory.models import (
     ResumeSourceRecord,
     TailoredResumeRecord,
 )
-from memory.parser import ResumeParserAdapter
+from memory.parser import PydanticAIResumeParser, ResumeParserAdapter
 from memory.repository import ResumeMemoryRepository
 from memory.service import ResumeMemoryService
 from models.agents.output import AuditResult, CV, WorkExperience
@@ -517,3 +519,76 @@ def test_resolve_missing_file_raises_file_not_found(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         svc.resolve_original_resume(path=str(nonexistent))
+
+
+def test_parser_raises_when_agent_returns_no_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The parser adapter must fail clearly when the agent returns no structured output."""
+
+    class _FakeAgent:
+        def run_sync(self, content: str) -> SimpleNamespace:
+            return SimpleNamespace(output=None)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "workflows.agents",
+        SimpleNamespace(resume_parser_agent=_FakeAgent()),
+    )
+
+    parser = PydanticAIResumeParser()
+
+    with pytest.raises(ValueError, match="returned no output"):
+        parser.parse("# Jane Doe")
+
+
+def test_parser_raises_when_agent_returns_invalid_output_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The parser adapter must reject non-CV payloads from the agent."""
+
+    class _FakeAgent:
+        def run_sync(self, content: str) -> SimpleNamespace:
+            return SimpleNamespace(output={"full_name": "Jane"})
+
+    monkeypatch.setitem(
+        sys.modules,
+        "workflows.agents",
+        SimpleNamespace(resume_parser_agent=_FakeAgent()),
+    )
+
+    parser = PydanticAIResumeParser()
+
+    with pytest.raises(TypeError, match="expected CV"):
+        parser.parse("# Jane Doe")
+
+
+def test_resolve_raises_resume_memory_error_for_invalid_cached_cv_json(
+    tmp_path: Path,
+) -> None:
+    """Corrupted cached CV JSON must be surfaced as a domain error."""
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe")
+
+    svc, repo, _ = _make_service()
+    resolved = svc.resolve_original_resume(path=str(resume_file))
+    repo._parsed[resolved.source.id] = repo._parsed[resolved.source.id].model_copy(
+        update={"cv_json": '{"full_name": "Jane Doe"'}
+    )
+
+    with pytest.raises(ResumeMemoryError, match="stored parsed resume"):
+        svc.resolve_original_resume(path=str(resume_file))
+
+
+def test_resolve_raises_resume_memory_error_when_parser_fails(tmp_path: Path) -> None:
+    """Parser failures must be wrapped in a domain-level error."""
+
+    class _FailingParser(FakeParser):
+        def parse(self, content: str) -> CV:
+            raise ValueError("agent misbehaved")
+
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe")
+
+    svc, _, _ = _make_service(parser=_FailingParser())
+
+    with pytest.raises(ResumeMemoryError, match="Failed to parse"):
+        svc.resolve_original_resume(path=str(resume_file))

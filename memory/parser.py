@@ -71,9 +71,26 @@ class PydanticAIResumeParser(ResumeParserAdapter):
 
         Returns:
             Structured ``CV`` instance produced by the agent.
+
+        Raises:
+            ValueError: If the agent returns no structured output.
+            TypeError: If the agent returns a payload that is not a ``CV``.
         """
         # Lazy import to avoid OpenAI client instantiation at module load time.
         from workflows.agents import resume_parser_agent  # noqa: PLC0415
 
         result = resume_parser_agent.run_sync(content)
-        return result.output
+        output = result.output
+
+        if output is None:
+            raise ValueError(
+                "Resume parser agent returned no output; expected a CV instance."
+            )
+
+        if not isinstance(output, CV):
+            raise TypeError(
+                "Resume parser agent returned invalid output type "
+                f"{type(output).__name__}; expected CV."
+            )
+
+        return output
