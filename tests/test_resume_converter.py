@@ -45,3 +45,18 @@ class TestExceptionHierarchy:
             with subtests.test(msg=exc_class.__name__):
                 with pytest.raises(exc_class, match="test message"):
                     raise exc_class("test message")
+
+    def test_subclass_caught_by_base(self, subtests):
+        subclasses = [
+            ResumeFileNotFoundError,
+            UnsupportedFormatError,
+            ConversionFailedError,
+            EmptyConversionResultError,
+            NoResumeFileFoundError,
+            OutputConversionFailedError,
+            UnsupportedOutputFormatError,
+        ]
+        for exc_class in subclasses:
+            with subtests.test(msg=exc_class.__name__):
+                with pytest.raises(ResumeConverterError):
+                    raise exc_class("test")
