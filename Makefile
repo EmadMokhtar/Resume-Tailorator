@@ -1,4 +1,4 @@
-.PHONY: help install/uv install install/dev run
+.PHONY: help install/uv install install/dev test run
 
 help:  ## Show this help
 	@echo "🆘 Showing help"
@@ -20,6 +20,11 @@ install/dev: install/uv  ## Install dev deps with uv
 	@echo "📦 Installing development dependencies"
 	@uv sync --dev
 	@echo "✅ Done"
+
+test: install/dev  ## Run tests
+	@echo "🧪 Running tests..."
+	@uv run pytest -v
+	@echo "✅ Tests done"
 
 run: install ## Run the resume tailorator agentic workflow
 	@echo "🚀 Running Resume Tailorator..."
