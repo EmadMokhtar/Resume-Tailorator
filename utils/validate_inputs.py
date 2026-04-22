@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 
@@ -24,10 +25,25 @@ def validate_file(filepath, file_description, default_values):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Validate input files for the Resume Tailorator."
+    )
+    parser.add_argument(
+        "--resume-path",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to your original resume (Markdown). "
+            "When provided, the file is validated before the run. "
+            "When omitted, resume validation is skipped (the memory service "
+            "will resolve the latest stored resume at runtime)."
+        ),
+    )
+    args = parser.parse_args()
+
     base_dir = os.getcwd()
     files_dir = os.path.join(base_dir, "files")
 
-    resume_path = os.path.join(files_dir, "resume.md")
     job_posting_path = os.path.join(files_dir, "job_posting.md")
 
     # Define default values that should trigger an error
@@ -45,11 +61,15 @@ def main():
         "[Company Name]",
     ]
 
-    valid_resume = validate_file(resume_path, "Resume file", resume_defaults)
     valid_job = validate_file(job_posting_path, "Job posting file", job_defaults)
 
-    if not (valid_resume and valid_job):
-        sys.exit(1)
+    if args.resume_path is not None:
+        valid_resume = validate_file(args.resume_path, "Resume file", resume_defaults)
+        if not (valid_resume and valid_job):
+            sys.exit(1)
+    else:
+        if not valid_job:
+            sys.exit(1)
 
     print("✅ Input files validated successfully.")
 

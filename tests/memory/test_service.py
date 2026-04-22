@@ -348,7 +348,7 @@ def test_resolve_without_path_and_no_stored_source_raises() -> None:
     """With no path and no stored sources, MissingOriginalResumeError must be raised."""
     svc, _, _ = _make_service()
 
-    with pytest.raises(MissingOriginalResumeError):
+    with pytest.raises(MissingOriginalResumeError, match="--resume-path"):
         svc.resolve_original_resume(path=None)
 
 

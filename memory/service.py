@@ -97,7 +97,7 @@ class ResumeMemoryService:
             if latest is None:
                 raise MissingOriginalResumeError(
                     "No original resume found. Please provide a path to your "
-                    "resume with --resume on the first run."
+                    "resume with --resume-path on the first run."
                 )
             file_path = latest.path  # already normalised when it was stored
 

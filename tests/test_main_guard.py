@@ -1,13 +1,6 @@
-"""Minimal guard test: main() must fail fast until Task 6 wires the memory service."""
+"""Placeholder: guard test removed in Task 6.
 
-import pytest
-
-import main as main_module
-
-
-@pytest.mark.asyncio
-async def test_main_raises_not_implemented_before_task6() -> None:
-    """main() must raise NotImplementedError with a Task 6 message rather than passing
-    a raw string into workflow.run(), which now expects a structured CV object."""
-    with pytest.raises(NotImplementedError, match="Task 6"):
-        await main_module.main()
+The NotImplementedError sentinel that existed before Task 6 has been removed
+now that main() is fully wired to the memory service.  Behavioural coverage
+lives in tests/test_main.py.
+"""
