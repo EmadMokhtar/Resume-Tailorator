@@ -102,7 +102,9 @@ class MarkdownOutputConverter:
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(content, encoding="utf-8")
-        except OSError as exc:
+        except OutputConversionFailedError:
+            raise
+        except Exception as exc:
             raise OutputConversionFailedError(
                 f"Failed to write markdown: {exc}"
             ) from exc
