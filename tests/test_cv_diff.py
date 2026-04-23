@@ -2,12 +2,11 @@
 
 These are pure-Python tests — no LLM calls.
 """
+
 import pytest
 
 from models.agents.output import (
     CV,
-    CVDiff,
-    GapAnalysis,
     JobAnalysis,
     WorkExperience,
 )
@@ -17,6 +16,7 @@ from utils.cv_diff import compute_cv_diff, compute_gap_analysis
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def original_cv() -> CV:
@@ -86,6 +86,7 @@ def job_analysis() -> JobAnalysis:
 # compute_cv_diff tests
 # ---------------------------------------------------------------------------
 
+
 def test_cv_diff_detects_summary_change(original_cv: CV, tailored_cv: CV):
     diff = compute_cv_diff(original_cv, tailored_cv)
     assert diff.summary_changed is True
@@ -148,6 +149,7 @@ def test_cv_diff_identical_cv_produces_empty_diff(original_cv: CV, subtests):
 # ---------------------------------------------------------------------------
 # compute_gap_analysis tests
 # ---------------------------------------------------------------------------
+
 
 def test_gap_analysis_missing_hard_skills(
     original_cv: CV, tailored_cv: CV, job_analysis: JobAnalysis, subtests

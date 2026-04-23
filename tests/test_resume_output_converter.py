@@ -29,8 +29,6 @@ SAMPLE_RESULT = ResumeTailorResult(
     passed=True,
 )
 
-SAMPLE_MARKDOWN = "# Jane Smith\n\n## Professional Summary\nExperienced engineer.\n"
-
 
 class TestBuildResumeMarkdown:
     def test_returns_nonempty_string(self):

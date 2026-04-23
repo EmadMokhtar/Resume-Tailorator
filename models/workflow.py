@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from models.agents.output import AuditResult, CV, FinalReport, JobAnalysis, ReviewResult
+from models.agents.output import FinalReport
 
 
 class ResumeTailorResult(BaseModel):
