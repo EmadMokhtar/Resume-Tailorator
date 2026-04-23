@@ -1,9 +1,14 @@
+import argparse
 import asyncio
+import logging
 import os
 
-from models.agents.output import FinalReport
+from models.agents.output import FinalReport, ScrapedJobPosting
 from utils.markdown_writer import generate_report_markdown, generate_resume
 from workflows import ResumeTailorWorkflow
+from workflows.agents import job_scraper_agent
+
+logger = logging.getLogger(__name__)
 
 
 def _get_company_slug(company_name: str) -> str:
@@ -79,18 +84,21 @@ def _print_report_to_console(report: FinalReport) -> None:
     print("=" * width)
 
 
-async def main() -> None:
+async def main(job_url: str | None = None) -> None:
     """Execute the resume tailoring workflow.
 
     This function performs the following steps:
     1. Reads the original resume from files/resume.md
-    2. Loads the job posting from files/job_posting.md
+    2. Loads or scrapes the job posting (from URL if provided, or from files/job_posting.md)
     3. Runs the ResumeTailorWorkflow to tailor the resume
     4. If audit passes: saves the tailored CV
     5. Always: prints and saves the self-review report
 
     The report is saved to files/report_{company_slug}.md regardless of audit result.
     If any file is missing or an error occurs, a warning is printed and execution continues.
+
+    Args:
+        job_url: Optional URL to scrape job posting from. If not provided, uses local file.
     """
     # --- Inputs ---
     files_path = os.path.join(os.getcwd(), "files")
@@ -109,19 +117,51 @@ async def main() -> None:
     except (IOError, OSError) as e:
         print(f"⚠️ Error reading resume file: {e}")
 
-    # Validate job file exists before workflow
-    if not os.path.exists(job_content_file_path):
-        print(
-            f"⚠️ Job posting file not found at {job_content_file_path}. "
-            "Please ensure the file exists before running the workflow."
-        )
-        return
+    # Load or scrape job posting
+    job_posting_markdown: str = ""
+
+    if job_url:
+        # Scrape job posting from URL (takes priority)
+        print(f"🌐 Scraping job posting from URL: {job_url}")
+        try:
+            scrape_result = await job_scraper_agent.run(
+                f"Extract and convert to Markdown this job posting: {job_url}",
+            )
+            if isinstance(scrape_result.output, ScrapedJobPosting):
+                job_posting_markdown = scrape_result.output.markdown
+                print(f"✅ Job posting scraped successfully from {job_url}")
+            else:
+                print(f"⚠️ Unexpected scraper output type: {type(scrape_result.output)}")
+                return
+        except Exception as e:
+            print(f"❌ Failed to scrape job posting from URL: {e}")
+            print(
+                "💡 Tip: Ensure the URL is publicly accessible and contains a valid job posting."
+            )
+            return
+    else:
+        # Load job posting from markdown file
+        if not os.path.exists(job_content_file_path):
+            print(
+                f"⚠️ Job posting file not found at {job_content_file_path}. "
+                "Please provide --job-url or ensure the file exists."
+            )
+            return
+
+        try:
+            with open(job_content_file_path, encoding="utf-8") as f:
+                job_posting_markdown = f.read()
+        except (IOError, OSError) as e:
+            print(f"❌ Error reading job posting file: {e}")
+            return
+
+        if not job_posting_markdown.strip():
+            print(f"❌ Job posting file is empty: {job_content_file_path}")
+            return
 
     # Run the workflow
     workflow = ResumeTailorWorkflow()
-    result = await workflow.run(
-        original_cv_text, job_content_file_path=job_content_file_path
-    )
+    result = await workflow.run(original_cv_text, job_content=job_posting_markdown)
 
     # Save tailored CV if audit passed
     if result.passed:
@@ -151,4 +191,14 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(
+        description="Resume Tailorator - Tailor your resume for any job"
+    )
+    parser.add_argument(
+        "--job-url",
+        default=os.environ.get("JOB_URL"),
+        help="URL of job posting to scrape",
+    )
+    args = parser.parse_args()
+
+    asyncio.run(main(job_url=args.job_url))
