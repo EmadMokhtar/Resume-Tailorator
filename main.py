@@ -6,6 +6,18 @@ from utils.markdown_writer import generate_report_markdown, generate_resume
 from workflows import ResumeTailorWorkflow
 
 
+def _get_company_slug(company_name: str) -> str:
+    """Extract a URL-safe slug from a company name.
+
+    Args:
+        company_name: The company name to convert.
+
+    Returns:
+        A lowercase slug with spaces replaced by underscores.
+    """
+    return company_name.replace(" ", "_").lower()
+
+
 def _print_report_to_console(report: FinalReport) -> None:
     """Print a compact self-review report summary to stdout."""
     width = 60
@@ -67,9 +79,22 @@ def _print_report_to_console(report: FinalReport) -> None:
     print("=" * width)
 
 
-async def main():
+async def main() -> None:
+    """Execute the resume tailoring workflow.
+
+    This function performs the following steps:
+    1. Reads the original resume from files/resume.md
+    2. Loads the job posting from files/job_posting.md
+    3. Runs the ResumeTailorWorkflow to tailor the resume
+    4. If audit passes: saves the tailored CV
+    5. Always: prints and saves the self-review report
+
+    The report is saved to files/report_{company_slug}.md regardless of audit result.
+    If any file is missing or an error occurs, a warning is printed and execution continues.
+    """
     # --- Inputs ---
     files_path = os.path.join(os.getcwd(), "files")
+    os.makedirs(files_path, exist_ok=True)
     job_content_file_path = os.path.join(files_path, "job_posting.md")
     resume_file_path = os.path.join(files_path, "resume.md")
     original_cv_text: str = ""
@@ -81,8 +106,16 @@ async def main():
         print(
             f"⚠️ Resume file not found at {resume_file_path}. Continuing with empty resume."
         )
-    except Exception as e:
+    except (IOError, OSError) as e:
         print(f"⚠️ Error reading resume file: {e}")
+
+    # Validate job file exists before workflow
+    if not os.path.exists(job_content_file_path):
+        print(
+            f"⚠️ Job posting file not found at {job_content_file_path}. "
+            "Please ensure the file exists before running the workflow."
+        )
+        return
 
     # Run the workflow
     workflow = ResumeTailorWorkflow()
@@ -96,18 +129,23 @@ async def main():
         generate_resume(result)
     else:
         print("\n❌ Audit Failed. Please review the feedback and try again.")
-        print(f"Feedback: {result.audit_report.get('feedback_summary', '')}")
+        feedback = result.audit_report.get("feedback_summary", "No feedback available")
+        print(f"Feedback: {feedback}")
 
     # Print and save the self-review report (always)
     if result.final_report is not None:
         _print_report_to_console(result.final_report)
 
         report_md = generate_report_markdown(result.final_report)
-        company_slug = result.company_name.replace(" ", "_").lower()
+        company_slug = _get_company_slug(result.company_name)
         report_path = os.path.join(files_path, f"report_{company_slug}.md")
-        with open(report_path, "w", encoding="utf-8") as f:
-            f.write(report_md)
-        print(f"\n📄 Report saved to: {report_path}")
+
+        try:
+            with open(report_path, "w", encoding="utf-8") as f:
+                f.write(report_md)
+            print(f"\n📄 Report saved to: {report_path}")
+        except IOError as e:
+            print(f"⚠️ Error writing report file: {e}")
     else:
         print("\n⚠️ Self-review report could not be generated.")
 
