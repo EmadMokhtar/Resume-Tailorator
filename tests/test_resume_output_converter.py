@@ -1,6 +1,18 @@
 import json
 
+import pytest
+
 from models.workflow import ResumeTailorResult
+from utils.resume_converter import (
+    OutputConversionFailedError,
+    UnsupportedOutputFormatError,
+)
+from utils.resume_output_converter import (
+    DocxOutputConverter,
+    MarkdownOutputConverter,
+    OutputConverterRegistry,
+    PdfOutputConverter,
+)
 
 
 SAMPLE_RESULT = ResumeTailorResult(
@@ -28,6 +40,8 @@ SAMPLE_RESULT = ResumeTailorResult(
     audit_report={},
     passed=True,
 )
+
+SAMPLE_MARKDOWN = "# Jane Smith\n\n## Professional Summary\nExperienced engineer.\n"
 
 
 class TestBuildResumeMarkdown:
@@ -89,3 +103,103 @@ class TestBuildResumeMarkdown:
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "Python Patterns" in result
+
+
+class TestMarkdownOutputConverter:
+    def test_writes_content_to_file(self, tmp_path):
+        converter = MarkdownOutputConverter()
+        output_path = tmp_path / "tailored_resume.md"
+        converter.convert(SAMPLE_MARKDOWN, output_path)
+        assert output_path.exists()
+        assert output_path.read_text(encoding="utf-8") == SAMPLE_MARKDOWN
+
+    def test_creates_parent_directory_if_missing(self, tmp_path):
+        converter = MarkdownOutputConverter()
+        output_path = tmp_path / "subdir" / "tailored_resume.md"
+        converter.convert(SAMPLE_MARKDOWN, output_path)
+        assert output_path.exists()
+
+    def test_raises_output_conversion_failed_on_write_error(self, tmp_path):
+        converter = MarkdownOutputConverter()
+        bad_path = tmp_path / "tailored_resume.md"
+        bad_path.mkdir()
+        with pytest.raises(OutputConversionFailedError):
+            converter.convert(SAMPLE_MARKDOWN, bad_path)
+
+
+class TestPdfOutputConverter:
+    def test_writes_pdf_file(self, tmp_path):
+        converter = PdfOutputConverter()
+        output_path = tmp_path / "tailored_resume.pdf"
+        converter.convert(SAMPLE_MARKDOWN, output_path)
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+
+    def test_pdf_file_starts_with_pdf_header(self, tmp_path):
+        converter = PdfOutputConverter()
+        output_path = tmp_path / "tailored_resume.pdf"
+        converter.convert(SAMPLE_MARKDOWN, output_path)
+        assert output_path.read_bytes()[:4] == b"%PDF"
+
+
+class TestDocxOutputConverter:
+    def test_writes_docx_file(self, tmp_path):
+        converter = DocxOutputConverter()
+        output_path = tmp_path / "tailored_resume.docx"
+        converter.convert(SAMPLE_MARKDOWN, output_path)
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+
+    def test_docx_headings_are_preserved(self, tmp_path):
+        from docx import Document
+
+        converter = DocxOutputConverter()
+        output_path = tmp_path / "tailored_resume.docx"
+        content = "# Jane Smith\n\n## Skills\n\n- Python\n\nSome paragraph.\n"
+        converter.convert(content, output_path)
+        doc = Document(str(output_path))
+        all_text = " ".join(p.text for p in doc.paragraphs)
+        assert "Jane Smith" in all_text
+        assert "Skills" in all_text
+        assert "Python" in all_text
+
+
+class TestOutputConverterRegistry:
+    def test_get_md_returns_markdown_converter(self):
+        registry = OutputConverterRegistry()
+        assert isinstance(registry.get("md"), MarkdownOutputConverter)
+
+    def test_get_pdf_returns_pdf_converter(self):
+        registry = OutputConverterRegistry()
+        assert isinstance(registry.get("pdf"), PdfOutputConverter)
+
+    def test_get_docx_returns_docx_converter(self):
+        registry = OutputConverterRegistry()
+        assert isinstance(registry.get("docx"), DocxOutputConverter)
+
+    def test_get_raises_unsupported_output_format_for_unknown(self):
+        registry = OutputConverterRegistry()
+        with pytest.raises(UnsupportedOutputFormatError):
+            registry.get("html")
+
+    def test_convert_all_writes_each_requested_format(self, tmp_path):
+        registry = OutputConverterRegistry()
+        registry.convert_all(SAMPLE_MARKDOWN, ["md", "docx"], tmp_path)
+        assert (tmp_path / "tailored_resume.md").exists()
+        assert (tmp_path / "tailored_resume.docx").exists()
+
+    def test_convert_all_returns_correct_paths(self, tmp_path):
+        registry = OutputConverterRegistry()
+        written = registry.convert_all(SAMPLE_MARKDOWN, ["md"], tmp_path)
+        assert written == [tmp_path / "tailored_resume.md"]
+
+    def test_convert_all_with_all_formats(self, tmp_path, subtests):
+        registry = OutputConverterRegistry()
+        written = registry.convert_all(SAMPLE_MARKDOWN, ["md", "pdf", "docx"], tmp_path)
+        assert len(written) == 3
+        with subtests.test("md"):
+            assert (tmp_path / "tailored_resume.md").exists()
+        with subtests.test("pdf"):
+            assert (tmp_path / "tailored_resume.pdf").exists()
+        with subtests.test("docx"):
+            assert (tmp_path / "tailored_resume.docx").exists()
