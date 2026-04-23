@@ -1,4 +1,3 @@
-# Add this import at the top
 import os
 import json
 
@@ -89,16 +88,16 @@ def generate_report_markdown(report: FinalReport) -> str:
     lines: list[str] = []
 
     lines.append(f"# Self-Review Report — {report.company_name} · {report.job_title}\n")
-    lines.append(f"**Generated:** {report.generated_at}  ")
+    lines.append(f"**Generated:** {report.generated_at}  \n")
     lines.append(f"**Audit Passed:** {'✅ Yes' if report.passed else '❌ No'}\n")
 
     lines.append("---\n")
 
     # Match score and recommendation
     lines.append("## 🎯 Match Score & Recommendation\n")
-    lines.append(f"**Score:** {report.match_score}/100  ")
+    lines.append(f"**Score:** {report.match_score}/100  \n")
     lines.append(f"**Verdict:** {report.overall_recommendation}\n")
-    lines.append(f"\n{report.recommendation_rationale}\n")
+    lines.append(f"{report.recommendation_rationale}\n")
 
     # What changed
     lines.append("---\n")
@@ -107,14 +106,18 @@ def generate_report_markdown(report: FinalReport) -> str:
     if not diff.sections_modified:
         lines.append("_No significant changes detected._\n")
     else:
+        rendered_any = False
         if diff.summary_changed:
             lines.append("- **Summary** was rewritten\n")
+            rendered_any = True
         if diff.skills_reordered:
             reordered = ", ".join(diff.skills_reordered)
             lines.append(f"- **Skills reordered to top:** {reordered}\n")
+            rendered_any = True
         if diff.skills_deprioritized:
             deprioritized = ", ".join(diff.skills_deprioritized)
             lines.append(f"- **Skills deprioritized:** {deprioritized}\n")
+            rendered_any = True
         for exp_change in diff.experience_changes:
             lines.append(
                 f"- **{exp_change.role} at {exp_change.company}:** "
@@ -123,15 +126,23 @@ def generate_report_markdown(report: FinalReport) -> str:
             )
             for bullet in exp_change.bullets_rephrased:
                 lines.append(f"  - {bullet}\n")
+            rendered_any = True
+        if not rendered_any:
+            lines.append("_Changes noted but details unavailable._\n")
 
     # Keyword coverage
     lines.append("---\n")
     lines.append("## 🔑 Keyword Coverage\n")
     gap = report.gaps
     total = len(gap.covered_keywords) + len(gap.missing_keywords)
+    if total > 0:
+        pct = (len(gap.covered_keywords) / total) * 100
+        coverage_str = f"{len(gap.covered_keywords)}/{total}"
+    else:
+        pct = 0.0
+        coverage_str = "N/A"
     lines.append(
-        f"**{len(gap.covered_keywords)}/{total} keywords covered "
-        f"({gap.keyword_coverage_percent:.1f}%)**\n"
+        f"**Keywords covered: {coverage_str} ({pct:.1f}%)**\n"
     )
     if gap.covered_keywords:
         covered_str = ", ".join(f"`{k}`" for k in gap.covered_keywords)
@@ -156,12 +167,15 @@ def generate_report_markdown(report: FinalReport) -> str:
     # Suggestions
     lines.append("---\n")
     lines.append("## 💡 Suggestions to Strengthen Your Application\n")
-    for suggestion in report.suggestions_to_strengthen:
-        lines.append(f"- {suggestion}\n")
+    if not report.suggestions_to_strengthen:
+        lines.append("_No additional suggestions — your application looks strong!_\n")
+    else:
+        for suggestion in report.suggestions_to_strengthen:
+            lines.append(f"- {suggestion}\n")
 
     # Audit summary
     lines.append("---\n")
     lines.append("## 🔍 Audit Summary\n")
     lines.append(f"{report.audit_summary}\n")
 
-    return "\n".join(lines)
+    return "".join(lines)
