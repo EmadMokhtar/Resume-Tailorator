@@ -74,7 +74,6 @@ analyst_agent = Agent(
     Look for 'hidden' keywords that ATS systems might scan for.
     """,
     output_type=JobAnalysis,
-    tools=[read_job_content_file],
     retries=5,
 )
 
