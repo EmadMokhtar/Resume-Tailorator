@@ -61,7 +61,7 @@ class ResumeTailorWorkflow:
                     f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete resume parse, retrying..."
                 )
 
-            except UnexpectedModelBehavior as e:
+            except UnexpectedModelBehavior:
                 if _parser_qs.last_output is not None:
                     print("⚠️  Resume Parser quality gate exhausted — using best available output")
                     original_cv = _parser_qs.last_output
@@ -110,7 +110,7 @@ class ResumeTailorWorkflow:
                     f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete job data, retrying..."
                 )
 
-            except UnexpectedModelBehavior as e:
+            except UnexpectedModelBehavior:
                 if _analyst_qs.last_output is not None:
                     print("⚠️  Job Analyst quality gate exhausted — using best available output")
                     job_analysis = _analyst_qs.last_output
@@ -192,7 +192,7 @@ Rewrite the CV to match the Job Analysis while addressing all audit feedback.
             try:
                 writer_result = await writer_agent.run(writer_prompt, usage=total_usage)
                 new_cv = writer_result.output or None
-            except UnexpectedModelBehavior as e:
+            except UnexpectedModelBehavior:
                 if _writer_qs.last_output is not None:
                     print("⚠️  CV Writer quality gate exhausted — using best available output")
                     new_cv = _writer_qs.last_output
@@ -315,7 +315,7 @@ Compare the two structured CVs carefully. Ensure that:
             try:
                 audit_result = await auditor_agent.run(audit_prompt, usage=total_usage)
                 audit = audit_result.output
-            except UnexpectedModelBehavior as e:
+            except UnexpectedModelBehavior:
                 if _auditor_qs.last_output is not None:
                     print("⚠️  Auditor quality gate exhausted — using best available output")
                     audit = _auditor_qs.last_output
