@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from utils.resume_converter import (
     ConversionFailedError,
@@ -152,6 +153,19 @@ class TestInputConverterRegistry:
         with pytest.raises(ResumeFileNotFoundError):
             registry.convert_and_save(tmp_path / "missing.docx", tmp_path / "out.md")
 
+    def test_convert_and_save_raises_output_conversion_failed_on_write_error(
+        self, sample_docx, tmp_path, monkeypatch
+    ):
+        registry = InputConverterRegistry()
+        output_path = tmp_path / "out.md"
+
+        def boom(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(Path, "write_text", boom)
+        with pytest.raises(OutputConversionFailedError, match="disk full"):
+            registry.convert_and_save(sample_docx, output_path)
+
 
 class TestAutoDetectResume:
     def test_prefers_docx_over_pdf_and_md(self, tmp_path):
@@ -172,3 +186,8 @@ class TestAutoDetectResume:
     def test_raises_no_resume_found_when_directory_is_empty(self, tmp_path):
         with pytest.raises(NoResumeFileFoundError):
             auto_detect_resume(tmp_path)
+
+    def test_raises_no_resume_found_when_directory_does_not_exist(self, tmp_path):
+        non_existent = tmp_path / "no_such_dir"
+        with pytest.raises(NoResumeFileFoundError, match="does not exist"):
+            auto_detect_resume(non_existent)
