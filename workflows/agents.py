@@ -297,3 +297,25 @@ report_agent = Agent(
     output_type=FinalReport,
     retries=5,
 )
+
+
+# ---------------------------------------------------------------------------
+# Quality Gate Validators
+# ---------------------------------------------------------------------------
+
+
+@resume_parser_agent.output_validator
+async def _validate_resume_parser(ctx: RunContext[None], output: CV) -> CV:
+    """Score the resume parser output. Raises ModelRetry if score < 9."""
+    _parser_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: Resume Parser\nOutput:\n{output.model_dump_json(indent=2)}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
