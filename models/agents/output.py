@@ -126,3 +126,14 @@ class FinalReport(BaseModel):
     audit_summary: str
     recommendation_rationale: str
     passed: bool
+
+
+class QualityCheckResult(BaseModel):
+    """Result from the quality gate agent scoring another agent's output."""
+
+    score: int = Field(..., ge=0, le=10, description="Quality score 0-10. >=9 passes.")
+    reasoning: str = Field(description="Explanation of why this score was given.")
+    improvements: list[str] = Field(
+        default_factory=list,
+        description="Concrete improvements needed if score < 9.",
+    )
