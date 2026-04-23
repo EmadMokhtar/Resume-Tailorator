@@ -1,4 +1,5 @@
 """Integration tests for report_agent using TestModel (no real LLM calls)."""
+
 import pytest
 from pydantic_ai import models
 from pydantic_ai.models.test import TestModel
@@ -61,7 +62,11 @@ async def test_report_agent_output_has_required_fields(subtests: SubTests) -> No
     output = result.output
 
     with subtests.test("overall_recommendation"):
-        assert output.overall_recommendation in ("Strong Match", "Partial Match", "Weak Match")
+        assert output.overall_recommendation in (
+            "Strong Match",
+            "Partial Match",
+            "Weak Match",
+        )
 
     with subtests.test("match_score_range"):
         assert 0 <= output.match_score <= 100

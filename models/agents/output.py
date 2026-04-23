@@ -105,6 +105,7 @@ class GapAnalysis(BaseModel):
     missing_keywords: list[str] = []
     keyword_coverage_percent: float = 0.0
 
+
 class FinalReport(BaseModel):
     """Complete self-review report combining diff, gap analysis, and narrative."""
 
@@ -112,7 +113,11 @@ class FinalReport(BaseModel):
     company_name: str
     generated_at: str  # ISO 8601 timestamp
     overall_recommendation: str
-    match_score: int = Field(ge=0, le=100, description="0–100 match score based on keyword coverage and gap severity.")
+    match_score: int = Field(
+        ge=0,
+        le=100,
+        description="0–100 match score based on keyword coverage and gap severity.",
+    )
     what_changed: CVDiff
     gaps: GapAnalysis
     suggestions_to_strengthen: list[str] = []

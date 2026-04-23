@@ -3,14 +3,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Protocol
 
 from models.workflow import ResumeTailorResult
-from utils.resume_converter import (
-    OutputConversionFailedError,
-    UnsupportedOutputFormatError,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -40,11 +34,6 @@ def build_resume_markdown(result: ResumeTailorResult) -> str:
     for skill in cv.get("skills", []):
         parts.append(f"- {skill}\n")
 
-    if cv.get("projects"):
-        parts.append("\n## Projects\n")
-        for project in cv.get("projects", []):
-            parts.append(f"{project}\n\n")
-
     parts.append("\n## Work Experience\n")
     for exp in cv.get("experience", []):
         parts.append(
@@ -68,5 +57,10 @@ def build_resume_markdown(result: ResumeTailorResult) -> str:
         parts.append("\n## Publications\n")
         for pub in cv.get("publications", []):
             parts.append(f"- {pub}\n")
+
+    if cv.get("projects"):
+        parts.append("\n## Projects\n")
+        for project in cv.get("projects", []):
+            parts.append(f"{project}\n\n")
 
     return "".join(parts)

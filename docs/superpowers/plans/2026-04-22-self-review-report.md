@@ -12,13 +12,13 @@
 
 ## Pre-work: Add test dependencies
 
-- [ ] **Step 1: Add pytest and anyio dev dependencies**
+- [ ] **Step 1: Add anyio test dependencies** (`pytest` and `pytest-subtests` are already in dev deps)
 
 ```bash
-uv add --dev pytest pytest-anyio anyio
+uv add --dev pytest-anyio anyio
 ```
 
-Expected: `pyproject.toml` updated, lockfile updated.
+Expected: `pyproject.toml` updated with `pytest-anyio` and `anyio`, lockfile updated.
 
 - [ ] **Step 2: Verify pytest runs (empty suite)**
 
@@ -32,7 +32,7 @@ Expected: `no tests ran` or `0 passed`.
 
 ```bash
 git add pyproject.toml uv.lock
-git commit -m "build(deps): add pytest and anyio for testing"
+git commit -m "build(deps): add pytest-anyio and anyio for async testing"
 ```
 
 ---
@@ -784,14 +784,35 @@ git commit -m "feat(agent): add report_agent with ReportNarrative output type"
 **Files:**
 - Modify: `utils/markdown_writer.py`
 
-- [ ] **Step 1: Append `generate_report_markdown` to `utils/markdown_writer.py`**
+- [ ] **Step 1: Add `FinalReport` import to the top of `utils/markdown_writer.py`**
 
-Add at the bottom of the file, after the existing `generate_resume` function:
+The current imports at the top of `utils/markdown_writer.py` are:
+```python
+# Add this import at the top
+import os
+import json
+
+from models.workflow import ResumeTailorResult
+from utils.pdf_converter import markdown_to_pdf
+```
+
+Add `FinalReport` to the existing import from `models.agents.output`. Since that import doesn't exist yet, add it as a new line after the `from models.workflow` import:
 
 ```python
+# Add this import at the top
+import os
+import json
+
 from models.agents.output import FinalReport
+from models.workflow import ResumeTailorResult
+from utils.pdf_converter import markdown_to_pdf
+```
 
+- [ ] **Step 2: Append `generate_report_markdown` to `utils/markdown_writer.py`**
 
+Add the function at the bottom of the file, after the existing `generate_resume` function:
+
+```python
 def generate_report_markdown(report: FinalReport) -> str:
     """Render a FinalReport as a Markdown string.
 

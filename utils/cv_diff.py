@@ -2,6 +2,7 @@
 
 No LLM calls. All comparisons are done on Pydantic model fields directly.
 """
+
 from __future__ import annotations
 
 from models.agents.output import CV, CVDiff, ExperienceChange, GapAnalysis, JobAnalysis
@@ -49,8 +50,7 @@ def compute_cv_diff(original: CV, tailored: CV) -> CVDiff:
 
     # Build lookup for tailored experience by (company, role)
     tailored_exp_map = {
-        (exp.company.strip(), exp.role.strip()): exp
-        for exp in tailored.experience
+        (exp.company.strip(), exp.role.strip()): exp for exp in tailored.experience
     }
 
     for orig_exp in original.experience:
@@ -66,7 +66,9 @@ def compute_cv_diff(original: CV, tailored: CV) -> CVDiff:
             if i < len(tail_exp.highlights):
                 tail_bullet = tail_exp.highlights[i]
                 if orig_bullet.strip() != tail_bullet.strip():
-                    bullets_rephrased.append(f"{orig_bullet.strip()} → {tail_bullet.strip()}")
+                    bullets_rephrased.append(
+                        f"{orig_bullet.strip()} → {tail_bullet.strip()}"
+                    )
                 else:
                     bullets_unchanged += 1
             else:
@@ -116,12 +118,10 @@ def compute_gap_analysis(
 
     # --- Missing hard/soft skills (from original CV, not tailored) ---
     missing_hard = [
-        skill for skill in job.hard_skills
-        if skill.lower() not in original_skills_lower
+        skill for skill in job.hard_skills if skill.lower() not in original_skills_lower
     ]
     missing_soft = [
-        skill for skill in job.soft_skills
-        if skill.lower() not in original_skills_lower
+        skill for skill in job.soft_skills if skill.lower() not in original_skills_lower
     ]
 
     # --- Keyword coverage (from tailored CV text) ---
