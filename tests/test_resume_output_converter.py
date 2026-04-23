@@ -104,6 +104,30 @@ class TestBuildResumeMarkdown:
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "Python Patterns" in result
 
+    def test_raises_output_conversion_failed_on_invalid_json(self):
+        from utils.resume_output_converter import build_resume_markdown
+
+        bad_result = ResumeTailorResult(
+            company_name="Test",
+            tailored_resume="{invalid json}",
+            audit_report={},
+            passed=True,
+        )
+        with pytest.raises(OutputConversionFailedError):
+            build_resume_markdown(bad_result)
+
+    def test_handles_minimal_resume_fields(self):
+        from utils.resume_output_converter import build_resume_markdown
+
+        minimal_result = ResumeTailorResult(
+            company_name="Test",
+            tailored_resume=json.dumps({"full_name": "John Doe"}),
+            audit_report={},
+            passed=True,
+        )
+        result = build_resume_markdown(minimal_result)
+        assert "John Doe" in result
+
 
 class TestMarkdownOutputConverter:
     def test_writes_content_to_file(self, tmp_path):
@@ -203,3 +227,12 @@ class TestOutputConverterRegistry:
             assert (tmp_path / "tailored_resume.pdf").exists()
         with subtests.test("docx"):
             assert (tmp_path / "tailored_resume.docx").exists()
+
+    def test_get_is_case_insensitive(self, subtests):
+        registry = OutputConverterRegistry()
+        with subtests.test("MD uppercase"):
+            assert isinstance(registry.get("MD"), MarkdownOutputConverter)
+        with subtests.test("Pdf mixed"):
+            assert isinstance(registry.get("Pdf"), PdfOutputConverter)
+        with subtests.test("DOCX uppercase"):
+            assert isinstance(registry.get("DOCX"), DocxOutputConverter)
