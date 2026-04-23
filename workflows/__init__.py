@@ -1,15 +1,20 @@
 import sys
-from pydantic_ai import AgentRunResult
+from datetime import datetime, timezone
 
+from pydantic_ai import AgentRunResult
+from pydantic_ai.usage import RunUsage
+
+from models.agents.output import CV, CVDiff, FinalReport, JobAnalysis
+from models.workflow import ResumeTailorResult
+from utils.cv_diff import compute_cv_diff, compute_gap_analysis
 from workflows.agents import (
     analyst_agent,
-    writer_agent,
     auditor_agent,
+    report_agent,
     resume_parser_agent,
     reviewer_agent,
+    writer_agent,
 )
-from models.agents.output import JobAnalysis, CV
-from models.workflow import ResumeTailorResult
 
 
 class ResumeTailorWorkflow:
@@ -25,13 +30,16 @@ class ResumeTailorWorkflow:
     ) -> ResumeTailorResult:
         print("🚀 STARTING MULTI-AGENT PIPELINE\n")
 
+        total_usage = RunUsage()
+
         # --- STEP 0: PARSE ORIGINAL RESUME ---
         print("🤖 Agent 0 (Parser): Parsing original resume...")
         original_cv_result: AgentRunResult[CV] | None = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 original_cv_result = await resume_parser_agent.run(
-                    f"Parse this resume into structured format:\n\n{resume_text}"
+                    f"Parse this resume into structured format:\n\n{resume_text}",
+                    usage=total_usage,
                 )
 
                 if original_cv_result.output is None:
@@ -41,7 +49,7 @@ class ResumeTailorWorkflow:
                     original_cv_result.output.full_name
                     and original_cv_result.output.experience
                 ):
-                    break  # Success
+                    break
 
                 print(
                     f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete resume parse, retrying..."
@@ -61,7 +69,6 @@ class ResumeTailorWorkflow:
             f"   📋 Found {len(original_cv.skills)} skills, {len(original_cv.experience)} work experiences\n"
         )
 
-        # Store original CV as JSON for prompts
         original_cv_json = original_cv.model_dump_json()
 
         # --- STEP 1: ANALYZE JOB (Agent 1) ---
@@ -71,6 +78,7 @@ class ResumeTailorWorkflow:
             try:
                 job_analysis_result = await analyst_agent.run(
                     f"Analyze the job content located at this file path {job_content_file_path} and extract structured job data.",
+                    usage=total_usage,
                 )
 
                 print(f"   [Debug] Job Data: {job_analysis_result.output}")
@@ -82,7 +90,7 @@ class ResumeTailorWorkflow:
                     job_analysis_result.output.job_title
                     and job_analysis_result.output.company_name
                 ):
-                    break  # Success
+                    break
 
                 print(
                     f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete job data, retrying..."
@@ -103,12 +111,13 @@ class ResumeTailorWorkflow:
             f"   🎯 Keywords found: {job_analysis_result.output.keywords_to_target}\n"
         )
 
-        # Prepare a JSON/string representation of the job data for prompts
         job_data_json = job_analysis_result.output.model_dump_json()
 
-        # --- STEP 2: WRITE CV (Agent 2) with AUDIT LOOP ---
-        new_cv = None
+        # --- STEP 2: WRITE + REVIEW + AUDIT LOOP ---
+        new_cv: CV | None = None
         audit = None
+        review = None
+        audit_passed = False
 
         for write_attempt in range(self.max_write_attempts):
             print(
@@ -127,7 +136,6 @@ Rewrite the CV to match the Job Analysis. Use ONLY the information from the Orig
 Rephrase and reorganize to highlight relevant experience, but do NOT add new skills or experiences.
 """
             else:
-                # Retry with audit feedback
                 print("   🔄 Retrying with audit feedback...")
                 issues_text = "\n".join(
                     [
@@ -159,17 +167,12 @@ CRITICAL RULES:
 Rewrite the CV to match the Job Analysis while addressing all audit feedback.
 """
 
-            writer_result = await writer_agent.run(writer_prompt)
+            writer_result = await writer_agent.run(writer_prompt, usage=total_usage)
 
             new_cv = writer_result.output or None
             if new_cv is None:
                 if write_attempt == self.max_write_attempts - 1:
-                    return ResumeTailorResult(
-                        company_name="",
-                        tailored_resume="",
-                        audit_report={},
-                        passed=False,
-                    )
+                    break  # exhausted retries — report phase still runs below
                 continue
 
             print(f"   ✅ CV Drafted. Summary: {new_cv.summary[:100]}...\n")
@@ -190,7 +193,9 @@ Assess quality and suggest improvements if needed.
 """
 
                 try:
-                    review_result = await reviewer_agent.run(review_prompt)
+                    review_result = await reviewer_agent.run(
+                        review_prompt, usage=total_usage
+                    )
                     review = review_result.output
 
                     if review is None:
@@ -208,12 +213,10 @@ Assess quality and suggest improvements if needed.
                     ):
                         print("   🔄 Quality improvements needed, refining...\n")
 
-                        # Prepare suggestions text
                         suggestions_text = "\n".join(
                             f"- {s}" for s in review.specific_suggestions
                         )
 
-                        # Refine CV based on review
                         improvement_prompt = f"""
 Improve this CV based on reviewer feedback:
 
@@ -234,7 +237,9 @@ CRITICAL RULES:
 Focus on better highlighting relevant experience and incorporating job keywords naturally.
 """
 
-                        refined_result = await writer_agent.run(improvement_prompt)
+                        refined_result = await writer_agent.run(
+                            improvement_prompt, usage=total_usage
+                        )
                         if refined_result.output:
                             new_cv = refined_result.output
                             print("   ✅ CV refined based on feedback\n")
@@ -252,14 +257,13 @@ Focus on better highlighting relevant experience and incorporating job keywords 
                     print(f"   ⚠️ Review failed: {e}, continuing with current CV\n")
                     break
 
-            # For auditor prompt, prepare serializations
+            # --- STEP 3: AUDIT (Agent 3) ---
             new_cv_json = (
                 new_cv.model_dump_json()
                 if hasattr(new_cv, "model_dump_json")
                 else str(new_cv)
             )
 
-            # --- STEP 3: AUDIT (Agent 3) ---
             print("🤖 Agent 3 (Auditor): Validating for hallucinations and AI-speak...")
             audit_prompt = f"""
 ORIGINAL CV (structured):
@@ -278,7 +282,7 @@ Compare the two structured CVs carefully. Ensure that:
 4. The language is professional and not AI-generated sounding
 5. The new CV properly targets the job requirements using only original information
 """
-            audit_result = await auditor_agent.run(audit_prompt)
+            audit_result = await auditor_agent.run(audit_prompt, usage=total_usage)
 
             audit = audit_result.output
             if audit is None:
@@ -288,47 +292,12 @@ Compare the two structured CVs carefully. Ensure that:
                     continue
                 else:
                     print("   ❌ Max attempts reached\n")
-                    # Return failure result
-                    return ResumeTailorResult(
-                        company_name="",
-                        tailored_resume="",
-                        audit_report={
-                            "passed": False,
-                            "hallucination_score": None,
-                            "ai_cliche_score": None,
-                            "feedback_summary": "Audit failed to return results after multiple attempts.",
-                            "issues": [],
-                        },
-                        passed=False,
-                    )
+                    break
 
-            # Check if audit passed
-            passed = getattr(audit, "passed", False)
-            if passed:
+            audit_passed = getattr(audit, "passed", False)
+            if audit_passed:
                 print(f"   ✅ Audit passed on attempt {write_attempt + 1}!\n")
-                return ResumeTailorResult(
-                    company_name=job_analysis_result.output.company_name,
-                    tailored_resume=new_cv.model_dump_json()
-                    if new_cv and hasattr(new_cv, "model_dump_json")
-                    else str(new_cv),
-                    audit_report={
-                        "passed": getattr(audit, "passed", None),
-                        "hallucination_score": getattr(
-                            audit, "hallucination_score", None
-                        ),
-                        "ai_cliche_score": getattr(audit, "ai_cliche_score", None),
-                        "feedback_summary": getattr(audit, "feedback_summary", ""),
-                        "issues": [
-                            {
-                                "severity": getattr(i, "severity", "Unknown"),
-                                "issue": getattr(i, "issue", str(i)),
-                                "suggestion": getattr(i, "suggestion", ""),
-                            }
-                            for i in getattr(audit, "issues", []) or []
-                        ],
-                    },
-                    passed=True,
-                )
+                break  # exit loop — report phase runs below
             else:
                 print(f"   ⚠️ Audit failed on attempt {write_attempt + 1}")
                 if write_attempt < self.max_write_attempts - 1:
@@ -336,67 +305,109 @@ Compare the two structured CVs carefully. Ensure that:
                 else:
                     print("   ❌ Max attempts reached\n")
 
-        # --- REPORTING ---
+        # Print audit report regardless of pass/fail
         print("\n" + "=" * 30)
         print("📋 FINAL AUDIT REPORT")
         print("=" * 30)
 
-        # Ensure audit has a value, provide defaults if it's somehow None
         if audit is None:
             print("⚠️ Warning: No audit result available")
-            return ResumeTailorResult(
-                company_name=job_analysis_result.output.company_name,
-                tailored_resume="",
-                audit_report={
-                    "passed": False,
-                    "hallucination_score": None,
-                    "ai_cliche_score": None,
-                    "feedback_summary": "No audit result available.",
-                    "issues": [],
-                },
-                passed=False,
+        else:
+            passed_display = getattr(audit, "passed", None)
+            hallucination_score = getattr(audit, "hallucination_score", None)
+            ai_cliche_score = getattr(audit, "ai_cliche_score", None)
+            feedback_summary = getattr(audit, "feedback_summary", "")
+
+            print(f"Passed: {passed_display}")
+            print(f"Hallucination Score (0 is best): {hallucination_score}")
+            print(f"AI Cliche Score (0 is best): {ai_cliche_score}")
+            print(f"Feedback: {feedback_summary}")
+
+            issues = getattr(audit, "issues", []) or []
+            if issues:
+                print("\n⚠️ Issues Found:")
+                for i in issues:
+                    sev = getattr(i, "severity", "Unknown")
+                    issue_text = getattr(i, "issue", str(i))
+                    suggestion = getattr(i, "suggestion", "")
+                    print(f" - [{sev}] {issue_text} -> {suggestion}")
+
+        # === REPORT PHASE — always runs ===
+        final_report: FinalReport | None = None
+        try:
+            print("\n🤖 Agent 5 (Report Writer): Generating self-review report...")
+
+            cv_diff = (
+                compute_cv_diff(original_cv, new_cv) if new_cv is not None else CVDiff()
+            )
+            gap_analysis = compute_gap_analysis(
+                original_cv,
+                new_cv,
+                job_analysis_result.output,
             )
 
-        passed = getattr(audit, "passed", None)
-        hallucination_score = getattr(audit, "hallucination_score", None)
-        ai_cliche_score = getattr(audit, "ai_cliche_score", None)
-        feedback_summary = getattr(audit, "feedback_summary", "")
+            review_json = review.model_dump_json() if review is not None else "N/A"
+            audit_json = audit.model_dump_json() if audit is not None else "N/A"
 
-        print(f"Passed: {passed}")
-        print(f"Hallucination Score (0 is best): {hallucination_score}")
-        print(f"AI Cliche Score (0 is best): {ai_cliche_score}")
-        print(f"Feedback: {feedback_summary}")
+            report_prompt = f"""
+CV Diff: {cv_diff.model_dump_json()}
+Gap Analysis: {gap_analysis.model_dump_json()}
+Audit Result: {audit_json}
+Review Result: {review_json}
+Job Analysis: {job_data_json}
+"""
 
-        issues = getattr(audit, "issues", []) or []
-        if issues:
-            print("\n⚠️ Issues Found:")
-            for i in issues:
-                sev = getattr(i, "severity", "Unknown")
-                issue_text = getattr(i, "issue", str(i))
-                suggestion = getattr(i, "suggestion", "")
-                print(f" - [{sev}] {issue_text} -> {suggestion}")
+            report_result = await report_agent.run(report_prompt, usage=total_usage)
+            narrative = report_result.output
 
-        # Return final result (even if audit failed)
+            final_report = FinalReport(
+                job_title=job_analysis_result.output.job_title,
+                company_name=job_analysis_result.output.company_name,
+                generated_at=datetime.now(timezone.utc).isoformat(),
+                overall_recommendation=narrative.overall_recommendation,
+                match_score=narrative.match_score,
+                what_changed=cv_diff,
+                gaps=gap_analysis,
+                suggestions_to_strengthen=narrative.suggestions_to_strengthen,
+                audit_summary=narrative.audit_summary,
+                recommendation_rationale=narrative.recommendation_rationale,
+                passed=audit_passed,
+            )
+            print("   ✅ Report generated.\n")
+
+        except Exception as e:
+            print(f"   ⚠️ Report generation failed: {e}\n")
+
+        # Build audit_report dict for backward compatibility
+        audit_report_dict: dict = {
+            "passed": audit_passed,
+            "hallucination_score": getattr(audit, "hallucination_score", None)
+            if audit
+            else None,
+            "ai_cliche_score": getattr(audit, "ai_cliche_score", None)
+            if audit
+            else None,
+            "feedback_summary": getattr(audit, "feedback_summary", "") if audit else "",
+            "issues": [
+                {
+                    "severity": getattr(i, "severity", "Unknown"),
+                    "issue": getattr(i, "issue", str(i)),
+                    "suggestion": getattr(i, "suggestion", ""),
+                }
+                for i in (getattr(audit, "issues", []) or [])
+            ],
+        }
+
         return ResumeTailorResult(
             company_name=job_analysis_result.output.company_name,
-            tailored_resume=new_cv.model_dump_json()
-            if new_cv and hasattr(new_cv, "model_dump_json")
-            else str(new_cv)
-            if new_cv
-            else "",
-            audit_report={
-                "passed": passed,
-                "hallucination_score": hallucination_score,
-                "ai_cliche_score": ai_cliche_score,
-                "feedback_summary": feedback_summary,
-                "issues": [
-                    {
-                        "severity": getattr(i, "severity", "Unknown"),
-                        "issue": getattr(i, "issue", str(i)),
-                        "suggestion": getattr(i, "suggestion", ""),
-                    }
-                    for i in issues
-                ],
-            },
-            passed=passed or False,
+            tailored_resume=(
+                new_cv.model_dump_json()
+                if new_cv and hasattr(new_cv, "model_dump_json")
+                else str(new_cv)
+                if new_cv
+                else ""
+            ),
+            audit_report=audit_report_dict,
+            passed=audit_passed,
+            final_report=final_report,
         )
