@@ -2,6 +2,7 @@
 import os
 import json
 
+from models.agents.output import FinalReport
 from models.workflow import ResumeTailorResult
 from utils.pdf_converter import markdown_to_pdf
 
@@ -74,3 +75,93 @@ def generate_resume(result: ResumeTailorResult) -> None:
     print(
         f"✅ Tailored CV saved to:\n   - Markdown: {md_output_path}\n   - PDF: {pdf_output_path}"
     )
+
+
+def generate_report_markdown(report: FinalReport) -> str:
+    """Render a FinalReport as a Markdown string.
+
+    Args:
+        report: The completed FinalReport.
+
+    Returns:
+        A Markdown-formatted string ready to write to a file.
+    """
+    lines: list[str] = []
+
+    lines.append(f"# Self-Review Report — {report.company_name} · {report.job_title}\n")
+    lines.append(f"**Generated:** {report.generated_at}  ")
+    lines.append(f"**Audit Passed:** {'✅ Yes' if report.passed else '❌ No'}\n")
+
+    lines.append("---\n")
+
+    # Match score and recommendation
+    lines.append("## 🎯 Match Score & Recommendation\n")
+    lines.append(f"**Score:** {report.match_score}/100  ")
+    lines.append(f"**Verdict:** {report.overall_recommendation}\n")
+    lines.append(f"\n{report.recommendation_rationale}\n")
+
+    # What changed
+    lines.append("---\n")
+    lines.append("## ✏️ What Changed\n")
+    diff = report.what_changed
+    if not diff.sections_modified:
+        lines.append("_No significant changes detected._\n")
+    else:
+        if diff.summary_changed:
+            lines.append("- **Summary** was rewritten\n")
+        if diff.skills_reordered:
+            reordered = ", ".join(diff.skills_reordered)
+            lines.append(f"- **Skills reordered to top:** {reordered}\n")
+        if diff.skills_deprioritized:
+            deprioritized = ", ".join(diff.skills_deprioritized)
+            lines.append(f"- **Skills deprioritized:** {deprioritized}\n")
+        for exp_change in diff.experience_changes:
+            lines.append(
+                f"- **{exp_change.role} at {exp_change.company}:** "
+                f"{len(exp_change.bullets_rephrased)} bullet(s) rephrased, "
+                f"{exp_change.bullets_unchanged} unchanged\n"
+            )
+            for bullet in exp_change.bullets_rephrased:
+                lines.append(f"  - {bullet}\n")
+
+    # Keyword coverage
+    lines.append("---\n")
+    lines.append("## 🔑 Keyword Coverage\n")
+    gap = report.gaps
+    total = len(gap.covered_keywords) + len(gap.missing_keywords)
+    lines.append(
+        f"**{len(gap.covered_keywords)}/{total} keywords covered "
+        f"({gap.keyword_coverage_percent:.1f}%)**\n"
+    )
+    if gap.covered_keywords:
+        covered_str = ", ".join(f"`{k}`" for k in gap.covered_keywords)
+        lines.append(f"\n✅ **Covered:** {covered_str}\n")
+    if gap.missing_keywords:
+        missing_str = ", ".join(f"`{k}`" for k in gap.missing_keywords)
+        lines.append(f"\n❌ **Missing:** {missing_str}\n")
+
+    # Skill gaps
+    lines.append("---\n")
+    lines.append("## 🚧 Skill Gaps\n")
+    if not gap.missing_hard_skills and not gap.missing_soft_skills:
+        lines.append("_No skill gaps detected — your CV covers all required skills!_\n")
+    else:
+        if gap.missing_hard_skills:
+            hard_str = ", ".join(gap.missing_hard_skills)
+            lines.append(f"**Hard skills not in your CV:** {hard_str}\n")
+        if gap.missing_soft_skills:
+            soft_str = ", ".join(gap.missing_soft_skills)
+            lines.append(f"**Soft skills not in your CV:** {soft_str}\n")
+
+    # Suggestions
+    lines.append("---\n")
+    lines.append("## 💡 Suggestions to Strengthen Your Application\n")
+    for suggestion in report.suggestions_to_strengthen:
+        lines.append(f"- {suggestion}\n")
+
+    # Audit summary
+    lines.append("---\n")
+    lines.append("## 🔍 Audit Summary\n")
+    lines.append(f"{report.audit_summary}\n")
+
+    return "\n".join(lines)
