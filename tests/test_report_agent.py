@@ -30,7 +30,7 @@ async def test_report_agent_returns_final_report() -> None:
         "passed": False,
     }
 
-    with report_agent.override(model=TestModel(custom_output_data=custom)):
+    with report_agent.override(model=TestModel(custom_output_args=custom)):
         result = await report_agent.run(
             "CV Diff: {} Gap Analysis: {} Audit: {} Review: {} Job: {}"
         )
@@ -56,7 +56,7 @@ async def test_report_agent_output_has_required_fields(subtests: SubTests) -> No
         "passed": True,
     }
 
-    with report_agent.override(model=TestModel(custom_output_data=custom)):
+    with report_agent.override(model=TestModel(custom_output_args=custom)):
         result = await report_agent.run("CV Diff: {} Gap Analysis: {}")
 
     output = result.output
