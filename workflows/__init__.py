@@ -399,8 +399,8 @@ Job Analysis: {job_data_json}
             narrative = report_result.output
 
             final_report = FinalReport(
-                job_title=job_analysis_result.output.job_title,
-                company_name=job_analysis_result.output.company_name,
+                job_title=job_analysis.job_title,
+                company_name=job_analysis.company_name,
                 generated_at=datetime.now(timezone.utc).isoformat(),
                 overall_recommendation=narrative.overall_recommendation,
                 match_score=narrative.match_score,
@@ -437,7 +437,7 @@ Job Analysis: {job_data_json}
         }
 
         return ResumeTailorResult(
-            company_name=job_analysis_result.output.company_name,
+            company_name=job_analysis.company_name,
             tailored_resume=(
                 new_cv.model_dump_json()
                 if new_cv and hasattr(new_cv, "model_dump_json")

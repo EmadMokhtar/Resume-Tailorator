@@ -268,7 +268,7 @@ def test_workflow_fallback_logs_warning_when_using_saved_output():
     _parser_qs.last_output = None
 
 
-
+def test_quality_state_singletons_importable():
     """Verify _QualityState singletons are importable from workflows.agents."""
     from workflows.agents import _analyst_qs, _auditor_qs, _parser_qs, _writer_qs
 
