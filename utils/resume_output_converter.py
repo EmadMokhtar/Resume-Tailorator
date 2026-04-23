@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from models.workflow import ResumeTailorResult
+from utils.resume_converter import OutputConversionFailedError
 
 
 # ---------------------------------------------------------------------------
@@ -21,7 +22,12 @@ def build_resume_markdown(result: ResumeTailorResult) -> str:
     Returns:
         Formatted Markdown string.
     """
-    cv = json.loads(result.tailored_resume)
+    try:
+        cv = json.loads(result.tailored_resume)
+    except json.JSONDecodeError as exc:
+        raise OutputConversionFailedError(
+            f"Invalid JSON in tailored_resume: {exc}"
+        ) from exc
     parts: list[str] = [f"# {cv.get('full_name', 'N/A')}\n"]
 
     if cv.get("contact_info"):
