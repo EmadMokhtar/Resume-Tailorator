@@ -1,4 +1,4 @@
-.PHONY: help install/uv install install/dev test tests run
+.PHONY: help install/uv install install/dev test run
 
 help:  ## Show this help
 	@echo "🆘 Showing help"
@@ -13,21 +13,20 @@ install/uv:  ## Ensure uv is installed: curl locally, pip in CI
 
 install: install/uv  ## Install deps (excluding dev) with uv
 	@echo "📦 Installing production dependencies"
-	@uv sync
+	@uv sync --no-dev
 	@echo "✅ Done"
 
 install/dev: install/uv  ## Install dev deps with uv
 	@echo "📦 Installing development dependencies"
-	@uv sync --dev
+	@uv sync
 	@echo "✅ Done"
 
-test: install/dev ## Run the test suite
+test: install/dev  ## Run tests
 	@echo "🧪 Running tests..."
-	@uv run pytest
-
-tests: test ## Alias for test
+	@uv run pytest -v
+	@echo "✅ Tests done"
 
 run: install ## Run the resume tailorator agentic workflow
 	@echo "🚀 Running Resume Tailorator..."
-	@uv run python utils/validate_inputs.py $(if $(RESUME_PATH),--resume-path "$(RESUME_PATH)")
-	@uv run python main.py $(if $(RESUME_PATH),--resume-path "$(RESUME_PATH)")
+	@uv run python utils/validate_inputs.py
+	@uv run python main.py

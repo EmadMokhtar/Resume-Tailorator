@@ -6,24 +6,31 @@ Resume Tailorator is a sophisticated multi-agent AI system designed to analyze j
 
 ## 🚀 Features
 
-- **Multi-Agent Architecture**: Uses specialized agents for analyzing, writing, and auditing.
+- **Multi-Agent Architecture**: Uses 7 specialized agents for comprehensive analysis, writing, and quality assurance.
 - **Automated Job Analysis**: Extracts key requirements and skills from job postings.
 - **Resume Memory**: Stores your original resume plus job-specific tailored outputs in SQLite.
 - **Authentic Tailoring**: Rephrases your experience to match the job without inventing skills.
 - **Hallucination & Cliché Detection**: Built-in auditor to ensure quality and "human" tone.
-- **Dual Output**: Generates both Markdown (`.md`) and PDF (`.pdf`) versions of the tailored resume.
+- **Quality Gate Validators**: Self-review mechanism that validates each agent's output (95%+ quality threshold) before proceeding.
+- **Comprehensive Reporting**: Generates detailed self-review reports including gaps analysis, suggestions, and recommendations.
+- **Cover Letter Generation**: Automatically generates tailored cover letters alongside resumes.
+- **Dual Output**: Generates both Markdown (`.md`) and PDF (`.pdf`) versions of the tailored resume and reports.
 - **Input Validation**: Ensures your input files are correctly formatted before processing.
-- **Self-Correcting Workflow**: The writer agent iterates based on feedback from the auditor.
+- **Self-Correcting Workflow**: Agents validate output and iterate based on quality feedback with retry logic.
 
 ## 🛠️ Architecture
 
-The system employs a sequential pipeline of AI agents:
+The system employs a sequential pipeline of 7 AI agents with integrated quality gates:
 
-1.  **Analyst Agent**: Extracts structured job requirements.
-2.  **Resume Parser Agent**: Parses your Markdown resume into structured data.
-3.  **Writer Agent**: Tailors the CV to match job requirements.
-4.  **Auditor Agent**: Validates for hallucinations and AI clichés.
-5.  **Reviewer Agent**: Provides quality feedback.
+1.  **Analyst Agent**: Extracts structured job requirements → Quality gate validates extraction (95%+)
+2.  **Resume Parser Agent**: Parses your Markdown resume into structured data → Quality gate validates parsing
+3.  **Writer Agent**: Tailors the CV to match job requirements → Quality gate validates tailoring
+4.  **Auditor Agent**: Validates for hallucinations and AI clichés → Quality gate validates audit quality
+5.  **Reviewer Agent**: Provides quality feedback and recommendations
+6.  **Cover Letter Writer Agent**: Generates tailored cover letter → Quality gate validates letter quality
+7.  **Report Agent**: Compiles comprehensive self-review report with gaps analysis and suggestions
+
+**Quality Gate System**: Each agent has a built-in validator that checks output quality (score ≥95/100). If quality is insufficient, the agent retries with corrective feedback (up to 5 attempts). If all retries are exhausted, the system uses fallback recovery from the last successful output.
 
 ## 📋 Prerequisites
 
@@ -77,9 +84,11 @@ The system employs a sequential pipeline of AI agents:
     ```
 
 4.  **View Results**:
-    Upon successful completion, the tailored resume will be saved in the `files/` directory:
-    *   `tailored_resume_<Company_Name>.md`
-    *   `tailored_resume_<Company_Name>.pdf`
+    Upon successful completion, the tailored resume and self-review report will be saved in the `files/` directory:
+    *   `tailored_resume_<Company_Name>.md` - Tailored resume in Markdown format
+    *   `tailored_resume_<Company_Name>.pdf` - Tailored resume in PDF format
+    *   `self_review_report_<Company_Name>.md` - Comprehensive self-review report (human-readable)
+    *   `cover_letter_<Company_Name>.md` - Generated cover letter in Markdown format
 
 ## 🧠 Resume Memory Behavior
 
@@ -89,6 +98,32 @@ The system employs a sequential pipeline of AI agents:
 - Every job submission starts from the original resume, never from a previous tailored resume.
 - Each successful tailoring run stores the tailored resume and audit result linked back to the original source resume.
 - The local memory database lives at `files/resume_memory.sqlite3`.
+
+## 📊 Self-Review Report
+
+Each workflow run generates a comprehensive **self-review report** that includes:
+
+- **What Changed**: Line-by-line diff between original and tailored resume
+- **Quality Metrics**: Hallucination score (0-10) and AI cliché score (0-10)
+- **Gap Analysis**: Missing skills/requirements from your resume vs. the job posting
+- **Suggestions to Strengthen**: Recommended improvements to better match the job
+- **Audit Summary**: Feedback from the auditor on tone, authenticity, and compliance
+- **Overall Recommendation**: Go/No-Go assessment for submitting the tailored resume
+- **Match Score**: Calculated score of how well your resume aligns with job requirements
+
+The report is saved as both:
+- `self_review_report_<Company_Name>.md` - Human-readable Markdown format
+- `self_review_report_<Company_Name>.json` - Structured JSON for programmatic access
+
+## ✅ Quality Gate System
+
+The system includes built-in quality validation for every agent:
+
+- **Validation Threshold**: Each agent's output must score ≥95/100 to proceed
+- **Automatic Retry**: If validation fails, the agent receives corrective feedback and retries (up to 5 attempts)
+- **Graceful Fallback**: If all retries are exhausted, the system uses the last successful output instead of failing
+- **Transparent Scoring**: Quality checks evaluate hallucination risk, authenticity, and task completion
+- **Token Usage Tracking**: All validation runs are included in usage metrics for accurate cost tracking
 
 ## 🛠️ Make Commands
 

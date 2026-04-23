@@ -1,41 +1,77 @@
-"""Pytest configuration for Resume Tailorator."""
-
 import os
-from collections.abc import Generator
 
 import pytest
+from pathlib import Path
 from pydantic_ai import models
 
-from models.agents.output import CV, WorkExperience
+# Allow OpenAI client to initialise in tests without a real key.
+os.environ.setdefault("OPENAI_API_KEY", "sk-test-dummy")
 
-# Provide a dummy key so pydantic-ai agent constructors don't fail at import time.
-# Real calls are blocked by the block_model_requests fixture below.
-os.environ.setdefault("OPENAI_API_KEY", "test-dummy-key-for-pytest")
+# Prevent accidental real LLM API calls across the entire test suite.
+models.ALLOW_MODEL_REQUESTS = False
 
 
-@pytest.fixture(autouse=True, scope="session")
-def block_model_requests() -> Generator[None, None, None]:
-    with models.override_allow_model_requests(False):
-        yield
+@pytest.fixture(params=["asyncio"])
+def anyio_backend() -> str:
+    """Restrict anyio tests to asyncio backend (trio is not installed)."""
+    return "asyncio"
+
+
+SAMPLE_MARKDOWN = """\
+# Jane Smith
+
+jane@example.com | linkedin.com/in/janesmith
+
+## Professional Summary
+
+Experienced Python engineer.
+
+## Skills
+
+- Python
+- Django
+
+## Work Experience
+
+### Senior Engineer at Acme Corp (2020-2024)
+
+- Built microservices
+
+## Education
+
+- BSc CS, State University, 2018
+"""
 
 
 @pytest.fixture
-def sample_cv() -> CV:
-    return CV(
-        full_name="Jane Doe",
-        contact_info="jane@example.com",
-        summary="Platform engineer with Python experience.",
-        skills=["Python", "SQL", "Communication"],
-        projects=["Built internal tooling"],
-        experience=[
-            WorkExperience(
-                company="Acme",
-                role="Software Engineer",
-                dates="2022-2026",
-                highlights=["Built Python services", "Improved reliability"],
-            )
-        ],
-        education=["BSc Computer Science"],
-        certifications=[],
-        publications=[],
-    )
+def sample_docx(tmp_path: Path) -> Path:
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("Jane Smith", 0)
+    doc.add_paragraph("jane@example.com | linkedin.com/in/janesmith")
+    doc.add_heading("Professional Summary", 1)
+    doc.add_paragraph("Experienced Python engineer.")
+    doc.add_heading("Skills", 1)
+    doc.add_paragraph("Python", style="List Bullet")
+    path = tmp_path / "resume.docx"
+    doc.save(str(path))
+    return path
+
+
+@pytest.fixture
+def sample_pdf(tmp_path: Path) -> Path:
+    from markdown_pdf import MarkdownPdf, Section
+
+    pdf = MarkdownPdf()
+    pdf.add_section(Section(SAMPLE_MARKDOWN))
+    path = tmp_path / "resume.pdf"
+    pdf.save(str(path))
+    return path
+
+
+@pytest.fixture
+def sample_markdown_path(tmp_path: Path) -> Path:
+    path = tmp_path / "resume.md"
+    path.write_text(SAMPLE_MARKDOWN, encoding="utf-8")
+    return path
