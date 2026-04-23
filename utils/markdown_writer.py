@@ -141,9 +141,7 @@ def generate_report_markdown(report: FinalReport) -> str:
     else:
         pct = 0.0
         coverage_str = "N/A"
-    lines.append(
-        f"**Keywords covered: {coverage_str} ({pct:.1f}%)**\n"
-    )
+    lines.append(f"**Keywords covered: {coverage_str} ({pct:.1f}%)**\n")
     if gap.covered_keywords:
         covered_str = ", ".join(f"`{k}`" for k in gap.covered_keywords)
         lines.append(f"\n✅ **Covered:** {covered_str}\n")

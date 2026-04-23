@@ -1,152 +1,115 @@
-import argparse
 import asyncio
-import sys
-from pathlib import Path
+import os
 
-from utils.markdown_writer import generate_resume
-from utils.resume_converter import (
-    ConversionFailedError,
-    EmptyConversionResultError,
-    InputConverterRegistry,
-    OutputConversionFailedError,
-    ResumeFileNotFoundError,
-    UnsupportedFormatError,
-)
-from utils.resume_output_converter import (
-    OutputConverterRegistry,
-    build_resume_markdown,
-)
+from models.agents.output import FinalReport
+from utils.markdown_writer import generate_report_markdown, generate_resume
 from workflows import ResumeTailorWorkflow
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create and return the CLI argument parser."""
-    parser = argparse.ArgumentParser(description="Tailor your resume to a job posting")
-    parser.add_argument(
-        "--resume",
-        type=str,
-        default="files/resume.md",
-        help="Path to input resume file (DOCX, PDF, or Markdown). "
-        "Defaults to files/resume.md",
+def _print_report_to_console(report: FinalReport) -> None:
+    """Print a compact self-review report summary to stdout."""
+    width = 60
+    print("\n" + "=" * width)
+    print(f"📊 SELF-REVIEW REPORT — {report.company_name} · {report.job_title}")
+    print("=" * width)
+    print(f"🎯 Match Score: {report.match_score}/100 · {report.overall_recommendation}")
+    print(f"📅 Generated: {report.generated_at}")
+    print(
+        f"{'✅' if report.passed else '❌'} Audit: {'Passed' if report.passed else 'Failed'}"
     )
-    parser.add_argument(
-        "--output",
-        type=str,
-        action="append",
-        default=None,
-        help="Output format(s): md, pdf, or docx (repeatable, case-insensitive). "
-        "Defaults to md",
+
+    print("\nWHAT CHANGED")
+    diff = report.what_changed
+    if not diff.sections_modified:
+        print("  (no significant changes detected)")
+    else:
+        if diff.summary_changed:
+            print("  ✏️  Summary rewritten")
+        if diff.skills_reordered:
+            print(f"  🔼 Skills reordered to top: {', '.join(diff.skills_reordered)}")
+        if diff.skills_deprioritized:
+            print(f"  🔽 Skills deprioritized: {', '.join(diff.skills_deprioritized)}")
+        for exp_change in diff.experience_changes:
+            print(
+                f"  📝 {exp_change.role} @ {exp_change.company}: "
+                f"{len(exp_change.bullets_rephrased)} bullet(s) rephrased"
+            )
+
+    gap = report.gaps
+    total_kw = len(gap.covered_keywords) + len(gap.missing_keywords)
+    print(
+        f"\nKEYWORD COVERAGE: {len(gap.covered_keywords)}/{total_kw} ({gap.keyword_coverage_percent:.1f}%)"
     )
-    return parser
+    if gap.covered_keywords:
+        print(f"  ✅ Covered: {', '.join(gap.covered_keywords)}")
+    if gap.missing_keywords:
+        print(f"  ❌ Missing: {', '.join(gap.missing_keywords)}")
+
+    print("\nSKILL GAPS (not in your CV)")
+    if gap.missing_hard_skills:
+        print(f"  Hard: {', '.join(gap.missing_hard_skills)}")
+    else:
+        print("  Hard: (none)")
+    if gap.missing_soft_skills:
+        print(f"  Soft: {', '.join(gap.missing_soft_skills)}")
+    else:
+        print("  Soft: (none)")
+
+    print("\nSUGGESTIONS TO STRENGTHEN")
+    for suggestion in report.suggestions_to_strengthen:
+        print(f"  → {suggestion}")
+
+    print(f"\nRECOMMENDATION: {report.overall_recommendation}")
+    # Indent the rationale to 2 spaces
+    for line in report.recommendation_rationale.splitlines():
+        print(f"  {line}")
+
+    print("=" * width)
 
 
-async def main_impl(resume_path: str, output_formats: list[str]) -> None:
-    """Implementation of main logic.
-
-    Args:
-        resume_path: Path to the input resume file.
-        output_formats: List of output formats (e.g., ['md', 'pdf', 'docx']).
-
-    Raises:
-        SystemExit: On conversion errors or audit failure (with exit code).
-    """
+async def main():
     # --- Inputs ---
-    files_path = Path.cwd() / "files"
-    job_content_file_path = files_path / "job_posting.md"
+    files_path = os.path.join(os.getcwd(), "files")
+    job_content_file_path = os.path.join(files_path, "job_posting.md")
+    resume_file_path = os.path.join(files_path, "resume.md")
     original_cv_text: str = ""
 
-    # --- Input Resume Processing ---
     try:
-        # Resolve resume path
-        resume_path_obj = Path(resume_path)
-        if not resume_path_obj.is_absolute():
-            resume_file_path = Path.cwd() / resume_path_obj
-        else:
-            resume_file_path = resume_path_obj
-
-        # Handle different file types
-        if resume_file_path.suffix.lower() == ".md":
-            # Read Markdown file directly
-            if not resume_file_path.exists():
-                raise ResumeFileNotFoundError(
-                    f"Resume file not found at {resume_file_path}"
-                )
-            with open(resume_file_path, "r", encoding="utf-8") as f:
-                original_cv_text = f.read()
-        elif resume_file_path.suffix.lower() in [".docx", ".pdf"]:
-            # Convert DOCX/PDF to Markdown using InputConverterRegistry
-            if not resume_file_path.exists():
-                raise ResumeFileNotFoundError(
-                    f"Resume file not found at {resume_file_path}"
-                )
-            registry = InputConverterRegistry()
-            converter = registry.get(resume_file_path.suffix)
-            original_cv_text = converter.convert(resume_file_path)
-        else:
-            raise UnsupportedFormatError(
-                f"Unsupported file format: {resume_file_path.suffix}. "
-                "Supported: .docx, .pdf, .md"
-            )
-    except (
-        UnsupportedFormatError,
-        ConversionFailedError,
-        EmptyConversionResultError,
-        ResumeFileNotFoundError,
-    ) as e:
-        print(f"❌ Error processing resume: {e}")
-        sys.exit(1)
+        with open(resume_file_path, encoding="utf-8") as f:
+            original_cv_text = f.read()
+    except FileNotFoundError:
+        print(
+            f"⚠️ Resume file not found at {resume_file_path}. Continuing with empty resume."
+        )
     except Exception as e:
-        print(f"❌ Unexpected error reading resume: {e}")
-        sys.exit(1)
+        print(f"⚠️ Error reading resume file: {e}")
 
-    # --- Run Workflow ---
+    # Run the workflow
     workflow = ResumeTailorWorkflow()
     result = await workflow.run(
-        original_cv_text, job_content_file_path=str(job_content_file_path)
+        original_cv_text, job_content_file_path=job_content_file_path
     )
 
-    # --- Output Processing ---
+    # Save tailored CV if audit passed
     if result.passed:
         print("\n✅ Audit Passed. Saving CV...")
-
-        # For backward compatibility, keep existing generate_resume call
         generate_resume(result)
-
-        # Build Markdown from result
-        try:
-            markdown_content = build_resume_markdown(result)
-        except OutputConversionFailedError as e:
-            print(f"❌ Error building resume markdown: {e}")
-            sys.exit(1)
-
-        # Convert to requested output formats
-        try:
-            # Normalize formats to lowercase
-            normalized_formats = [fmt.lower() for fmt in output_formats]
-            registry = OutputConverterRegistry()
-            written_paths = registry.convert_all(
-                markdown_content, normalized_formats, files_path
-            )
-            # Print success message with formats
-            file_names = ", ".join(p.name for p in written_paths)
-            print(f"✅ Tailored resume saved as: {file_names}")
-        except OutputConversionFailedError as e:
-            print(f"❌ Error converting resume to output formats: {e}")
-            sys.exit(1)
     else:
         print("\n❌ Audit Failed. Please review the feedback and try again.")
         print(f"Feedback: {result.audit_report.get('feedback_summary', '')}")
 
+    # Print and save the self-review report (always)
+    if result.final_report is not None:
+        _print_report_to_console(result.final_report)
 
-async def main() -> None:
-    """Parse CLI arguments and run main implementation."""
-    parser = create_parser()
-    args = parser.parse_args()
-
-    # Set default output formats if not provided
-    output_formats = args.output if args.output else ["md"]
-
-    await main_impl(resume_path=args.resume, output_formats=output_formats)
+        report_md = generate_report_markdown(result.final_report)
+        company_slug = result.company_name.replace(" ", "_").lower()
+        report_path = os.path.join(files_path, f"report_{company_slug}.md")
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(report_md)
+        print(f"\n📄 Report saved to: {report_path}")
+    else:
+        print("\n⚠️ Self-review report could not be generated.")
 
 
 if __name__ == "__main__":
