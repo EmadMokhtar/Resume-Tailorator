@@ -57,8 +57,15 @@ The system employs a sequential pipeline of 7 AI agents with integrated quality 
     ```bash
     export OPENAI_API_KEY=your_api_key_here
     ```
+    
+    *Optional: For automatic job scraping, you can also set:*
+    ```bash
+    export JOB_URL="https://example.com/job-posting"
+    ```
 
 ## 🏃 Usage
+
+### Option A: Manual Job Posting (Traditional)
 
 1.  **Prepare Input Files**:
     Navigate to the `files/` directory and update:
@@ -83,12 +90,63 @@ The system employs a sequential pipeline of 7 AI agents with integrated quality 
     make run RESUME_PATH=/absolute/path/to/updated_resume.md
     ```
 
-4.  **View Results**:
-    Upon successful completion, the tailored resume and self-review report will be saved in the `files/` directory:
-    *   `tailored_resume_<Company_Name>.md` - Tailored resume in Markdown format
-    *   `tailored_resume_<Company_Name>.pdf` - Tailored resume in PDF format
-    *   `self_review_report_<Company_Name>.md` - Comprehensive self-review report (human-readable)
-    *   `cover_letter_<Company_Name>.md` - Generated cover letter in Markdown format
+### Option B: Automatic Job Posting Scraping (New Feature)
+
+Resume Tailorator can automatically fetch and convert job postings from URLs, eliminating the need to manually copy-paste job descriptions.
+
+#### Using the `--job-url` CLI Argument
+
+```bash
+# Provide a job URL and resume path
+make run RESUME_PATH=/path/to/resume.md JOB_URL="https://example.com/job-posting"
+
+# Or just the job URL (reuses latest stored resume)
+make run JOB_URL="https://example.com/job-posting"
+```
+
+#### Using the `JOB_URL` Environment Variable
+
+```bash
+# Set environment variable and run
+export JOB_URL="https://example.com/job-posting"
+make run RESUME_PATH=/path/to/resume.md
+
+# Or reuse latest resume
+make run
+```
+
+#### How It Works
+
+1. **URL Provided**: System automatically scrapes and converts the job posting to Markdown
+2. **Intelligent Extraction**: Uses an LLM agent with multi-strategy fallback (Playwright → markitdown → html2text)
+3. **No Manual Copy-Paste**: Job content extracted from the live URL automatically
+4. **Retry Logic**: Handles JavaScript-heavy sites and common scraping obstacles
+5. **Priority**: `--job-url` argument > `JOB_URL` env var > `files/job_posting.md` (manual file)
+
+#### Supported Job Board Formats
+
+The scraper works with most job boards including:
+- LinkedIn
+- Indeed
+- GitHub Jobs
+- Company career pages
+- Custom job posting platforms
+
+#### Example: Fetch and Tailor in One Command
+
+```bash
+make run \
+  RESUME_PATH=$HOME/my-resume.md \
+  JOB_URL="https://www.linkedin.com/jobs/view/12345678"
+```
+
+### View Results
+
+Upon successful completion, the tailored resume and self-review report will be saved in the `files/` directory:
+*   `tailored_resume_<Company_Name>.md` - Tailored resume in Markdown format
+*   `tailored_resume_<Company_Name>.pdf` - Tailored resume in PDF format
+*   `self_review_report_<Company_Name>.md` - Comprehensive self-review report (human-readable)
+*   `cover_letter_<Company_Name>.md` - Generated cover letter in Markdown format
 
 ## 🧠 Resume Memory Behavior
 
@@ -130,13 +188,19 @@ The system includes built-in quality validation for every agent:
 This project uses a `Makefile` to simplify common tasks. Here are the available commands:
 
 | Command            | Description                                                     |
-|--------------------|-----------------------------------------------------------------|
+|--------------------|---------|
 | `make help`        | Show available commands and descriptions.                       |
 | `make install`     | Install production dependencies using `uv`.                     |
 | `make install/dev` | Install development dependencies using `uv`.                    |
 | `make run`         | Validate inputs and run the workflow using the latest original resume. |
 | `make run RESUME_PATH=/path/to/resume.md` | Import or switch the original resume for the run. |
+| `make run JOB_URL="https://..."` | Provide a job posting URL for automatic scraping. |
+| `make run RESUME_PATH=/path/to/resume.md JOB_URL="https://..."` | Both resume and job URL together. |
 | `make install/uv`  | Ensure `uv` is installed (automatically run by other commands). |
+
+**Parameter Priority:**
+- CLI `--job-url` / `JOB_URL` environment variable → Automatic scraping
+- Falls back to `files/job_posting.md` if no URL provided
 
 ## 📂 Project Structure
 
