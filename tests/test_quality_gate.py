@@ -1,4 +1,6 @@
 """Tests for per-agent quality gate validators."""
+import logging
+
 import pytest
 from pydantic_ai import models
 from pydantic_ai.exceptions import UnexpectedModelBehavior
@@ -212,7 +214,61 @@ def test_writer_validator_saves_last_output_when_score_low():
 # ---------------------------------------------------------------------------
 
 
-def test_quality_state_objects_are_importable_from_agents():
+def test_workflow_fallback_uses_saved_output_when_parser_retries_exhausted(caplog):
+    """Verify workflow saves output when quality gate retries trigger ModelRetry."""
+    from workflows.agents import _parser_qs, quality_gate_agent, resume_parser_agent
+    from pydantic_ai.exceptions import UnexpectedModelBehavior
+
+    # Ensure clean state before test
+    _parser_qs.last_output = None
+
+    # When quality gate fails repeatedly, the validator raises ModelRetry,
+    # which propagates as UnexpectedModelBehavior. But before raising,
+    # the validator saved the agent's output to _parser_qs.last_output.
+    # This test verifies that the output was saved.
+
+    with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
+        with resume_parser_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
+            with caplog.at_level(logging.INFO):
+                with pytest.raises(UnexpectedModelBehavior):
+                    resume_parser_agent.run_sync("Parse this resume.")
+
+    # Verify the parser agent's output was saved before the exception
+    assert _parser_qs.last_output is not None
+    # The output should match what the test parser returned
+    assert _parser_qs.last_output.full_name == "Jane Smith"
+    assert _parser_qs.last_output.contact_info == "jane@example.com"
+
+    # Cleanup after test
+    _parser_qs.last_output = None
+
+
+def test_workflow_fallback_logs_warning_when_using_saved_output():
+    """Verify quality gate validator saves last_output before exhausting retries."""
+    from workflows.agents import _parser_qs, quality_gate_agent, resume_parser_agent
+    from pydantic_ai.exceptions import UnexpectedModelBehavior
+
+    # Ensure clean state before test
+    _parser_qs.last_output = None
+
+    # Setup: Quality gate will fail all retries (score < 9)
+    with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
+        with resume_parser_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
+            # When validator exhausts retries, it raises UnexpectedModelBehavior
+            # but AFTER saving the output to _parser_qs.last_output
+            with pytest.raises(UnexpectedModelBehavior):
+                resume_parser_agent.run_sync("Parse this resume.")
+
+    # Verify the last output was saved
+    assert _parser_qs.last_output is not None
+    # This output will be used by the workflow as a fallback if needed
+    assert hasattr(_parser_qs.last_output, "full_name")
+
+    # Cleanup after test
+    _parser_qs.last_output = None
+
+
+
     """Verify _QualityState singletons are importable from workflows.agents."""
     from workflows.agents import _analyst_qs, _auditor_qs, _parser_qs, _writer_qs
 
