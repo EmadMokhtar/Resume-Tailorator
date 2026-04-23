@@ -122,18 +122,28 @@ async def main(job_url: str | None = None) -> None:
 
     if job_url:
         # Scrape job posting from URL (takes priority)
-        print(f"🌐 Scraping job posting from URL: {job_url}")
+        logger.info("scraping_job_posting", url=job_url)
         try:
             scrape_result = await job_scraper_agent.run(
                 f"Extract and convert to Markdown this job posting: {job_url}",
             )
             if isinstance(scrape_result.output, ScrapedJobPosting):
                 job_posting_markdown = scrape_result.output.markdown
+                if not job_posting_markdown.strip():
+                    logger.error("job_posting_scraped_but_empty", url=job_url)
+                    print("❌ Job posting scraped but content is empty")
+                    return
+                logger.info(
+                    "job_posting_scraped_successfully",
+                    url=job_url,
+                    content_length=len(job_posting_markdown),
+                )
                 print(f"✅ Job posting scraped successfully from {job_url}")
             else:
                 print(f"⚠️ Unexpected scraper output type: {type(scrape_result.output)}")
                 return
         except Exception as e:
+            logger.error("job_posting_scraping_failed", url=job_url, error=str(e))
             print(f"❌ Failed to scrape job posting from URL: {e}")
             print(
                 "💡 Tip: Ensure the URL is publicly accessible and contains a valid job posting."
