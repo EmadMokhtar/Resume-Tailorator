@@ -11,6 +11,7 @@ from utils.cv_diff import compute_cv_diff, compute_gap_analysis
 from workflows.agents import (
     _analyst_qs,
     _auditor_qs,
+    _cover_qs,
     _parser_qs,
     _writer_qs,
     analyst_agent,
@@ -381,7 +382,7 @@ Compare the two structured CVs carefully. Ensure that:
             gap_analysis = compute_gap_analysis(
                 original_cv,
                 new_cv,
-                job_analysis_result.output,
+                job_analysis_result.output if job_analysis_result and job_analysis_result.output else JobAnalysis(),
             )
 
             review_json = review.model_dump_json() if review is not None else "N/A"
