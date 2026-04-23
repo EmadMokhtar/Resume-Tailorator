@@ -108,13 +108,16 @@ def test_cv_diff_detects_skills_deprioritized(original_cv: CV, tailored_cv: CV):
     assert "Redis" in diff.skills_deprioritized
 
 
-def test_cv_diff_detects_rephrased_bullets(original_cv: CV, tailored_cv: CV):
+def test_cv_diff_detects_rephrased_bullets(original_cv: CV, tailored_cv: CV, subtests):
     diff = compute_cv_diff(original_cv, tailored_cv)
-    assert len(diff.experience_changes) == 1
+    assert len(diff.experience_changes) == 1  # guard/pre-condition, not a subtest
     change = diff.experience_changes[0]
-    assert change.company == "Acme Corp"
-    assert len(change.bullets_rephrased) == 1
-    assert "→" in change.bullets_rephrased[0]
+    with subtests.test("company_name"):
+        assert change.company == "Acme Corp"
+    with subtests.test("bullets_rephrased_count"):
+        assert len(change.bullets_rephrased) == 1
+    with subtests.test("arrow_separator"):
+        assert "→" in change.bullets_rephrased[0]
 
 
 def test_cv_diff_counts_unchanged_bullets(original_cv: CV, tailored_cv: CV):
@@ -128,13 +131,18 @@ def test_cv_diff_sections_modified_includes_summary(original_cv: CV, tailored_cv
     assert "summary" in diff.sections_modified
 
 
-def test_cv_diff_identical_cv_produces_empty_diff(original_cv: CV):
+def test_cv_diff_identical_cv_produces_empty_diff(original_cv: CV, subtests):
     diff = compute_cv_diff(original_cv, original_cv)
-    assert diff.summary_changed is False
-    assert diff.skills_reordered == []
-    assert diff.skills_deprioritized == []
-    assert diff.experience_changes == []
-    assert diff.sections_modified == []
+    with subtests.test("summary_changed"):
+        assert diff.summary_changed is False
+    with subtests.test("skills_reordered"):
+        assert diff.skills_reordered == []
+    with subtests.test("skills_deprioritized"):
+        assert diff.skills_deprioritized == []
+    with subtests.test("experience_changes"):
+        assert diff.experience_changes == []
+    with subtests.test("sections_modified"):
+        assert diff.sections_modified == []
 
 
 # ---------------------------------------------------------------------------
@@ -142,30 +150,33 @@ def test_cv_diff_identical_cv_produces_empty_diff(original_cv: CV):
 # ---------------------------------------------------------------------------
 
 def test_gap_analysis_missing_hard_skills(
-    original_cv: CV, tailored_cv: CV, job_analysis: JobAnalysis
+    original_cv: CV, tailored_cv: CV, job_analysis: JobAnalysis, subtests
 ):
     gap = compute_gap_analysis(original_cv, tailored_cv, job_analysis)
-    # Kubernetes and Terraform are not in original_cv.skills
-    assert "Kubernetes" in gap.missing_hard_skills
-    assert "Terraform" in gap.missing_hard_skills
+    with subtests.test("kubernetes_missing"):
+        assert "Kubernetes" in gap.missing_hard_skills
+    with subtests.test("terraform_missing"):
+        assert "Terraform" in gap.missing_hard_skills
 
 
 def test_gap_analysis_no_false_positive_for_existing_skill(
-    original_cv: CV, tailored_cv: CV, job_analysis: JobAnalysis
+    original_cv: CV, tailored_cv: CV, job_analysis: JobAnalysis, subtests
 ):
     gap = compute_gap_analysis(original_cv, tailored_cv, job_analysis)
-    # Python and Docker ARE in original_cv.skills — should NOT appear as missing
-    assert "Python" not in gap.missing_hard_skills
-    assert "Docker" not in gap.missing_hard_skills
+    with subtests.test("python_not_missing"):
+        assert "Python" not in gap.missing_hard_skills
+    with subtests.test("docker_not_missing"):
+        assert "Docker" not in gap.missing_hard_skills
 
 
 def test_gap_analysis_covered_keywords(
-    original_cv: CV, tailored_cv: CV, job_analysis: JobAnalysis
+    original_cv: CV, tailored_cv: CV, job_analysis: JobAnalysis, subtests
 ):
     gap = compute_gap_analysis(original_cv, tailored_cv, job_analysis)
-    # "Python", "Docker", "REST API" appear in tailored CV text
-    assert "Python" in gap.covered_keywords
-    assert "Docker" in gap.covered_keywords
+    with subtests.test("python_covered"):
+        assert "Python" in gap.covered_keywords
+    with subtests.test("docker_covered"):
+        assert "Docker" in gap.covered_keywords
 
 
 def test_gap_analysis_missing_keywords(
@@ -184,9 +195,11 @@ def test_gap_analysis_coverage_percent_is_between_0_and_100(
 
 
 def test_gap_analysis_when_tailored_cv_is_none_keyword_coverage_is_zero(
-    original_cv: CV, job_analysis: JobAnalysis
+    original_cv: CV, job_analysis: JobAnalysis, subtests
 ):
     """When writer fails (new_cv is None), coverage defaults to 0%."""
     gap = compute_gap_analysis(original_cv, None, job_analysis)
-    assert gap.keyword_coverage_percent == 0.0
-    assert gap.covered_keywords == []
+    with subtests.test("coverage_is_zero"):
+        assert gap.keyword_coverage_percent == 0.0
+    with subtests.test("covered_keywords_empty"):
+        assert gap.covered_keywords == []
