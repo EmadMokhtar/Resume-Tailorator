@@ -83,20 +83,19 @@ def test_resume_parser_validator_saves_last_output_when_score_low():
 # ---------------------------------------------------------------------------
 
 SAMPLE_AUDIT = {
+    "passed": True,
     "hallucination_score": 0,
-    "hallucination_details": [],
-    "cliche_score": 0,
-    "cliche_examples": [],
-    "ai_cliche_examples": [],
-    "recommendations": ["Sound professional", "Add metrics"],
+    "ai_cliche_score": 0,
+    "issues": [],
+    "feedback_summary": "Sound professional and add metrics.",
 }
 
 
 def test_auditor_validator_passes_when_score_9():
     from workflows.agents import auditor_agent, quality_gate_agent
 
-    with quality_gate_agent.override(model=TestModel(custom_output_data=QC_PASS)):
-        with auditor_agent.override(model=TestModel(custom_output_data=SAMPLE_AUDIT)):
+    with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
+        with auditor_agent.override(model=TestModel(custom_output_args=SAMPLE_AUDIT)):
             result = auditor_agent.run_sync("Audit this resume.")
 
     assert result.output.hallucination_score == 0
@@ -105,8 +104,8 @@ def test_auditor_validator_passes_when_score_9():
 def test_auditor_validator_saves_last_output_when_score_low():
     from workflows.agents import _auditor_qs, auditor_agent, quality_gate_agent
 
-    with quality_gate_agent.override(model=TestModel(custom_output_data=QC_FAIL)):
-        with auditor_agent.override(model=TestModel(custom_output_data=SAMPLE_AUDIT)):
+    with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
+        with auditor_agent.override(model=TestModel(custom_output_args=SAMPLE_AUDIT)):
             with pytest.raises(UnexpectedModelBehavior):
                 auditor_agent.run_sync("Audit this resume.")
 
@@ -188,8 +187,8 @@ def test_analyst_validator_saves_last_output_when_score_low():
 def test_writer_validator_passes_when_score_9():
     from workflows.agents import writer_agent, quality_gate_agent
 
-    with quality_gate_agent.override(model=TestModel(custom_output_data=QC_PASS)):
-        with writer_agent.override(model=TestModel(custom_output_data=SAMPLE_CV)):
+    with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
+        with writer_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
             result = writer_agent.run_sync("Tailor this resume.")
 
     assert result.output.full_name == "Jane Smith"
@@ -198,8 +197,8 @@ def test_writer_validator_passes_when_score_9():
 def test_writer_validator_saves_last_output_when_score_low():
     from workflows.agents import _writer_qs, writer_agent, quality_gate_agent
 
-    with quality_gate_agent.override(model=TestModel(custom_output_data=QC_FAIL)):
-        with writer_agent.override(model=TestModel(custom_output_data=SAMPLE_CV)):
+    with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
+        with writer_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
             with pytest.raises(UnexpectedModelBehavior):
                 writer_agent.run_sync("Tailor this resume.")
 

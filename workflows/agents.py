@@ -320,6 +320,23 @@ async def _validate_resume_parser(ctx: RunContext[None], output: CV) -> CV:
     return output
 
 
+@cover_letter_writer_agent.output_validator
+async def _validate_cover_letter_writer(ctx: RunContext[None], output: str) -> str:
+    """Score the cover letter output. Raises ModelRetry if score < 9."""
+    _cover_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: Cover Letter Writer\nOutput:\n{output}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
+
+
 @analyst_agent.output_validator
 async def _validate_analyst(ctx: RunContext[None], output: JobAnalysis) -> JobAnalysis:
     """Score the job analyst output. Raises ModelRetry if score < 9."""
