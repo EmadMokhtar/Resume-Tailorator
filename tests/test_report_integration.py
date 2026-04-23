@@ -1,5 +1,8 @@
 """Integration tests for report_agent using TestModel (no real LLM calls)."""
 
+# Workflow-level integration tests (calling ResumeTailorWorkflow) will be added in Task 7
+# once the Report Phase is wired into workflows/__init__.py.
+
 import pytest
 from pydantic_ai import models
 from pydantic_ai.models.test import TestModel
