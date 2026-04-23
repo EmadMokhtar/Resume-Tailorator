@@ -2,10 +2,13 @@ import os
 
 import pytest
 from pathlib import Path
+from pydantic_ai import models
 
 # Allow OpenAI client to initialise in tests without a real key.
-# pydantic-ai's ALLOW_MODEL_REQUESTS=False prevents actual API calls.
 os.environ.setdefault("OPENAI_API_KEY", "sk-test-dummy")
+
+# Prevent accidental real LLM API calls across the entire test suite.
+models.ALLOW_MODEL_REQUESTS = False
 
 
 @pytest.fixture(params=["asyncio"])
