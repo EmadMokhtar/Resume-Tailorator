@@ -320,6 +320,23 @@ async def _validate_resume_parser(ctx: RunContext[None], output: CV) -> CV:
     return output
 
 
+@auditor_agent.output_validator
+async def _validate_auditor(ctx: RunContext[None], output: AuditResult) -> AuditResult:
+    """Score the auditor output. Raises ModelRetry if score < 9."""
+    _auditor_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: Auditor\nOutput:\n{output.model_dump_json(indent=2)}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
+
+
 @cover_letter_writer_agent.output_validator
 async def _validate_cover_letter_writer(ctx: RunContext[None], output: str) -> str:
     """Score the cover letter output. Raises ModelRetry if score < 9."""
@@ -343,6 +360,23 @@ async def _validate_analyst(ctx: RunContext[None], output: JobAnalysis) -> JobAn
     _analyst_qs.last_output = output
     result = await quality_gate_agent.run(
         f"Role: Job Analyst\nOutput:\n{output.model_dump_json(indent=2)}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
+
+
+@writer_agent.output_validator
+async def _validate_writer(ctx: RunContext[None], output: CV) -> CV:
+    """Score the writer output. Raises ModelRetry if score < 9."""
+    _writer_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: CV Writer\nOutput:\n{output.model_dump_json(indent=2)}",
         usage=ctx.usage,
     )
     check = result.output
