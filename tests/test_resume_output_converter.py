@@ -17,6 +17,7 @@ from utils.resume_output_converter import (
 
 SAMPLE_RESULT = ResumeTailorResult(
     company_name="Acme",
+    job_title="Senior Python Engineer",
     tailored_resume=json.dumps(
         {
             "full_name": "Jane Smith",
@@ -109,6 +110,7 @@ class TestBuildResumeMarkdown:
 
         bad_result = ResumeTailorResult(
             company_name="Test",
+            job_title="Test Job",
             tailored_resume="{invalid json}",
             audit_report={},
             passed=True,
@@ -121,6 +123,7 @@ class TestBuildResumeMarkdown:
 
         minimal_result = ResumeTailorResult(
             company_name="Test",
+            job_title="Test Job",
             tailored_resume=json.dumps({"full_name": "John Doe"}),
             audit_report={},
             passed=True,
