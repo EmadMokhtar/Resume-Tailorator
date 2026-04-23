@@ -144,7 +144,9 @@ class DocxOutputConverter:
                     doc.add_paragraph(line.strip())
             output_path.parent.mkdir(parents=True, exist_ok=True)
             doc.save(str(output_path))
-        except OSError as exc:
+        except OutputConversionFailedError:
+            raise
+        except Exception as exc:
             raise OutputConversionFailedError(f"Failed to write docx: {exc}") from exc
 
 
