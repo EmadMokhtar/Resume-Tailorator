@@ -24,6 +24,7 @@ Coverage:
 """
 
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -39,6 +40,11 @@ from models.agents.output import (
     GapAnalysis,
 )
 from models.workflow import ResumeTailorResult
+
+# Pre-patch markdown_pdf to avoid import errors
+sys.modules['markdown_pdf'] = MagicMock()
+sys.modules['markdown_pdf'].MarkdownPdf = MagicMock()
+sys.modules['markdown_pdf'].Section = MagicMock()
 
 
 # ---------------------------------------------------------------------------
