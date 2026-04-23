@@ -63,20 +63,22 @@ class DocxInputConverter:
     """Converts .docx → Markdown via markitdown."""
 
     def convert(self, input_path: Path) -> str:
-        import zipfile
-
-        # Validate that the file is a ZIP archive (docx is a ZIP)
-        if not zipfile.is_zipfile(input_path):
-            raise ConversionFailedError(
-                f"File is not a valid .docx (ZIP) archive: {input_path}"
-            )
-
         try:
+            import zipfile
+
+            # Validate that the file is a ZIP archive (docx is a ZIP)
+            if not zipfile.is_zipfile(input_path):
+                raise ConversionFailedError(
+                    f"File is not a valid .docx (ZIP) archive: {input_path}"
+                )
+
             from markitdown import MarkItDown
 
             md = MarkItDown()
             result = md.convert(str(input_path))
             markdown = result.text_content
+        except ConversionFailedError:
+            raise
         except Exception as exc:
             raise ConversionFailedError(f"Failed to convert .docx: {exc}") from exc
 
@@ -91,20 +93,22 @@ class PdfInputConverter:
     """Converts .pdf → Markdown via markitdown."""
 
     def convert(self, input_path: Path) -> str:
-        # Validate PDF magic bytes
-        with open(input_path, "rb") as f:
-            header = f.read(5)
-        if header != b"%PDF-":
-            raise ConversionFailedError(
-                f"File is not a valid PDF (missing %PDF- header): {input_path}"
-            )
-
         try:
+            # Validate PDF magic bytes
+            with open(input_path, "rb") as f:
+                header = f.read(5)
+            if header != b"%PDF-":
+                raise ConversionFailedError(
+                    f"File is not a valid PDF (missing %PDF- header): {input_path}"
+                )
+
             from markitdown import MarkItDown
 
             md = MarkItDown()
             result = md.convert(str(input_path))
             markdown = result.text_content
+        except ConversionFailedError:
+            raise
         except Exception as exc:
             raise ConversionFailedError(f"Failed to convert .pdf: {exc}") from exc
 
