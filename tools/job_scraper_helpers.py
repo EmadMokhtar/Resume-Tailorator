@@ -89,25 +89,30 @@ def parse_html_with_html2text(html: str) -> str:
         return ""
 
 
-def detect_placeholder_content(text: str) -> bool:
+def detect_placeholder_content(text: str | None) -> bool:
     """Detect if text contains placeholder or error indicators.
 
-    Checks for common signs that parsing failed or returned incomplete content,
-    including unexecuted HTML/JavaScript code blocks, placeholder text, very short
-    content, and error messages.
+    Checks for common signs of parsing failure or incomplete extraction:
+    - None or empty string (no content extracted)
+    - Unexecuted HTML/JavaScript code blocks (<script tags)
+    - Placeholder/CTA text ("click here", "error loading")
+    - Minimum content length threshold (< 100 chars)
+    - HTTP error codes (404, etc.)
 
     Note: Legitimate mentions of "JavaScript" as a required skill are NOT flagged
     as placeholders. Only unexecuted code blocks (<script tags) are detected as
     parsing failures, which is the actual indicator of malformed content.
 
     Args:
-        text: Text to check for placeholder/error indicators.
+        text: Text to check for placeholder/error indicators, or None.
 
     Returns:
         True if content appears to be placeholder/error content. False if
         content likely represents real job posting data.
 
     Examples:
+        >>> detect_placeholder_content(None)
+        True
         >>> detect_placeholder_content("")
         True
         >>> detect_placeholder_content("Senior JavaScript Developer needed")
@@ -147,7 +152,7 @@ def detect_placeholder_content(text: str) -> bool:
     return False
 
 
-def clean_job_posting_markdown(markdown: str) -> str:
+def clean_job_posting_markdown(markdown: str | None) -> str:
     """Clean and normalize job posting markdown.
 
     Removes excessive whitespace, trailing spaces from lines, and normalizes
@@ -155,12 +160,14 @@ def clean_job_posting_markdown(markdown: str) -> str:
     processing and LLM input.
 
     Args:
-        markdown: Raw markdown from parser (potentially with excess whitespace).
+        markdown: Raw markdown from parser (potentially with excess whitespace), or None.
 
     Returns:
-        Cleaned markdown string with normalized formatting.
+        Cleaned markdown string with normalized formatting, or empty string if input was None/empty.
 
     Examples:
+        >>> clean_job_posting_markdown(None)
+        ""
         >>> clean_job_posting_markdown("")
         ""
         >>> clean_job_posting_markdown("line1\\n\\n\\n\\nline2")
