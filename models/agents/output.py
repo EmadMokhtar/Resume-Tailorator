@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -74,4 +76,64 @@ class ReviewResult(BaseModel):
     )
     strengths: list[str] = Field(
         default_factory=list, description="What's working well"
+    )
+
+
+class ExperienceChange(BaseModel):
+    """Tracks changes made to a single experience entry."""
+
+    role: str
+    company: str
+    bullets_rephrased: list[str] = []
+    bullets_unchanged: int = 0
+
+
+class CVDiff(BaseModel):
+    """Factual diff between the original CV and the tailored CV."""
+
+    summary_changed: bool = False
+    skills_reordered: list[str] = []
+    skills_deprioritized: list[str] = []
+    experience_changes: list[ExperienceChange] = []
+    sections_modified: list[str] = []
+
+
+class GapAnalysis(BaseModel):
+    """Gap analysis between job requirements and the original CV."""
+
+    missing_hard_skills: list[str] = []
+    missing_soft_skills: list[str] = []
+    covered_keywords: list[str] = []
+    missing_keywords: list[str] = []
+    keyword_coverage_percent: float = 0.0
+
+
+class FinalReport(BaseModel):
+    """Complete self-review report combining diff, gap analysis, and narrative."""
+
+    job_title: str
+    company_name: str
+    generated_at: str  # ISO 8601 timestamp
+    overall_recommendation: Literal["Strong Match", "Partial Match", "Weak Match"]
+    match_score: int = Field(
+        ge=0,
+        le=100,
+        description="0–100 match score based on keyword coverage and gap severity.",
+    )
+    what_changed: CVDiff
+    gaps: GapAnalysis
+    suggestions_to_strengthen: list[str] = []
+    audit_summary: str
+    recommendation_rationale: str
+    passed: bool
+
+
+class QualityCheckResult(BaseModel):
+    """Result from the quality gate agent scoring another agent's output."""
+
+    score: int = Field(..., ge=0, le=10, description="Quality score 0-10. >=9 passes.")
+    reasoning: str = Field(description="Explanation of why this score was given.")
+    improvements: list[str] = Field(
+        default_factory=list,
+        description="Concrete improvements needed if score < 9.",
     )

@@ -1,14 +1,57 @@
-from pydantic_ai import Agent
+from typing import Any
 
-from models.agents.output import JobAnalysis, CV, AuditResult, ReviewResult
+from pydantic import BaseModel, ConfigDict
+from pydantic_ai import Agent, ModelRetry, RunContext
+
+from models.agents.output import (
+    AuditResult,
+    CV,
+    JobAnalysis,
+    QualityCheckResult,
+    ReviewResult,
+    FinalReport,
+)
 from tools.playwright import read_job_content_file
 
-MODLE_NAME = "openai:gpt-5-mini"
+
+class _QualityState(BaseModel):
+    """Holds the last output from one pipeline agent for fallback recovery."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    last_output: Any = None
+
+
+_parser_qs = _QualityState()
+_analyst_qs = _QualityState()
+_writer_qs = _QualityState()
+_auditor_qs = _QualityState()
+_cover_qs = _QualityState()
+
+MODEL_NAME = "openai:gpt-5-mini"
+
+# --- Quality Gate Agent ---
+# Universal reviewer: scores any pipeline agent's output 0-10 and requests improvements.
+quality_gate_agent = Agent(
+    MODEL_NAME,
+    system_prompt="""You are a strict Quality Gate Reviewer for a resume tailoring pipeline.
+Score the output of the agent whose role is specified in the prompt, on a scale of 0 to 10.
+Scoring criteria by role:
+  - Resume Parser: completeness, no data loss, correctly structured fields
+  - Job Analyst: keyword coverage, clear requirement identification, no omissions
+  - CV Writer: no hallucinations, ATS keywords incorporated naturally, human tone, no clichés
+  - Auditor: thorough hallucination check, specific cliché identification, actionable feedback
+  - Cover Letter Writer: authentic human voice, no AI clichés, specific to the role, concise
+A score of 9 or 10 means ready to proceed.
+A score below 9 means the output must be improved before the pipeline continues.
+Always provide a reasoning and list specific improvements when score < 9.""",
+    output_type=QualityCheckResult,
+    retries=2,
+)
 
 # --- Agent 0: The Scraper ---
 # Responsibility: Fetch the job posting content.
 scraper_agent = Agent(
-    MODLE_NAME,
+    MODEL_NAME,
     system_prompt="""
     You are an expert Technical Recruiter.
     Your job is to analyze a raw job posting and extract structured data.
@@ -17,13 +60,13 @@ scraper_agent = Agent(
     """,
     output_type=JobAnalysis,
     tools=[read_job_content_file],
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 1: The Job Analyst ---
 # Responsibility: Turn Markdown or raw text into a structured JobAnalysis object.
 analyst_agent = Agent(
-    MODLE_NAME,
+    MODEL_NAME,
     system_prompt="""
     You are an expert Technical Recruiter.
     Your job is to analyze a raw job posting and extract structured data.
@@ -31,14 +74,13 @@ analyst_agent = Agent(
     Look for 'hidden' keywords that ATS systems might scan for.
     """,
     output_type=JobAnalysis,
-    tools=[read_job_content_file],
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 1.5: The Resume Parser ---
 # Responsibility: Parse markdown resume into structured CV object
 resume_parser_agent = Agent(
-    MODLE_NAME,
+    MODEL_NAME,
     system_prompt="""
     You are an expert Resume Parser.
     Your job is to parse a resume in Markdown format and extract all information into a structured format.
@@ -53,13 +95,13 @@ resume_parser_agent = Agent(
     7. Include all projects with their descriptions
     """,
     output_type=CV,
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 2: The Writer ---
 # Responsibility: Rewrite the CV based on the Analysis.
 writer_agent = Agent(
-    MODLE_NAME,
+    MODEL_NAME,
     system_prompt="""
     You are a Senior Resume Writer.
     Input: A structured CV object and a Job Analysis.
@@ -78,13 +120,13 @@ writer_agent = Agent(
     10. Group all the skills so that the most relevant skills to the job are at the top of the skills section
     """,
     output_type=CV,
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 3: The Auditor ---
 # Responsibility: Compare Original vs New to catch lies and AI-speak.
 auditor_agent = Agent(
-    MODLE_NAME,
+    MODEL_NAME,
     system_prompt="""
     You are a strict Compliance Auditor and Resume Quality Checker.
     Input: Original CV (structured), New CV (structured), and Job Analysis.
@@ -124,13 +166,13 @@ auditor_agent = Agent(
     Return a detailed structured Audit Result with specific issues and actionable suggestions.
     """,
     output_type=AuditResult,
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 4: The Cover Letter Writer ---
 # Responsibility: Write a personalized, human-sounding cover letter.
 cover_letter_writer_agent = Agent(
-    MODLE_NAME,
+    MODEL_NAME,
     system_prompt="""
     You are an experienced Career Coach specializing in authentic, human cover letters.
     Input: A structured CV object and a Job Analysis.
@@ -156,14 +198,14 @@ cover_letter_writer_agent = Agent(
     TONE: Professional but personable. Write like you're explaining to a friend why you're applying.
     """,
     output_type=str,  # or create a CoverLetter pydantic model if you want structured output
-    retries=3,
+    retries=5,
 )
 
 
 # --- Agent 3.5: The Reviewer ---
 # Responsibility: Review quality and suggest specific improvements
 reviewer_agent = Agent(
-    MODLE_NAME,
+    MODEL_NAME,
     system_prompt="""
     You are a Senior Resume Quality Reviewer.
     Input: A tailored CV and Job Analysis.
@@ -197,5 +239,150 @@ reviewer_agent = Agent(
     - strengths (list): What's working well
     """,
     output_type=ReviewResult,  # You'll need to create this model
-    retries=3,
+    retries=5,
 )
+
+
+# --- Agent 5: The Report Writer ---
+# Responsibility: Write the narrative section of the self-review report.
+# Receives pre-computed CVDiff, GapAnalysis, AuditResult, ReviewResult, and
+# JobAnalysis as structured JSON. Produces only narrative fields (factual diff
+# and gap data are injected by the workflow, not generated by the LLM).
+report_agent = Agent(
+    MODEL_NAME,
+    system_prompt="""
+    You are a Career Advisor writing a clear, honest self-review report.
+
+    You receive pre-computed structured data about:
+    - What changed between the original and tailored CV (CVDiff JSON)
+    - Skill and keyword gaps vs. job requirements (GapAnalysis JSON)
+    - Audit quality scores: hallucination and AI-cliché (AuditResult JSON)
+    - Quality review scores (ReviewResult JSON)
+    - Job requirements (JobAnalysis JSON)
+
+    Your job is to produce ONLY the following narrative fields:
+    1. overall_recommendation: exactly one of "Strong Match", "Partial Match", or "Weak Match"
+       - "Strong Match": keyword_coverage_percent >= 80 AND missing_hard_skills <= 1
+       - "Partial Match": keyword_coverage_percent >= 50 OR missing_hard_skills <= 3
+       - "Weak Match": everything else
+    2. match_score (0-100): base it primarily on keyword_coverage_percent,
+       subtract 5 points per missing hard skill, subtract 2 per missing soft skill.
+    3. suggestions_to_strengthen: 2-4 concrete, actionable items the candidate can do
+       to close the gaps (certifications, side projects, courses, etc.)
+    4. audit_summary: one paragraph in plain English summarising the hallucination
+       score and AI-cliché score from the AuditResult.
+    5. recommendation_rationale: one honest paragraph explaining your overall_recommendation.
+       Be direct. Do not sugarcoat weak matches.
+
+    CRITICAL RULES:
+    - Never use AI clichés: "orchestrated", "spearheaded", "leveraged", "synergy",
+      "tapestry", "dynamic", "innovative", "cutting-edge", "game-changer".
+    - Do not repeat the raw JSON back. Synthesise it into human-readable text.
+    - Be concise: audit_summary and recommendation_rationale should each be 2-4 sentences.
+
+    You also receive raw structured JSON in the user prompt. For the following fields,
+    copy them VERBATIM from the JSON input — do NOT reinterpret, summarise, or alter them:
+    - what_changed: copy the CVDiff JSON object exactly as provided
+    - gaps: copy the GapAnalysis JSON object exactly as provided
+    - job_title: copy the job title string exactly as provided
+    - company_name: copy the company name string exactly as provided
+    - generated_at: copy the ISO 8601 timestamp string exactly as provided
+
+    For the `passed` field: set it to true if BOTH of the following are true:
+    - AuditResult.passed is true (hallucination_score <= 2 and clique_score <= 2)
+    - overall_recommendation is "Strong Match" or "Partial Match"
+    Otherwise set passed to false.
+    """,
+    output_type=FinalReport,
+    retries=5,
+)
+
+
+# ---------------------------------------------------------------------------
+# Quality Gate Validators
+# ---------------------------------------------------------------------------
+
+
+@resume_parser_agent.output_validator
+async def _validate_resume_parser(ctx: RunContext[None], output: CV) -> CV:
+    """Score the resume parser output. Raises ModelRetry if score < 9."""
+    _parser_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: Resume Parser\nOutput:\n{output.model_dump_json(indent=2)}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
+
+
+@auditor_agent.output_validator
+async def _validate_auditor(ctx: RunContext[None], output: AuditResult) -> AuditResult:
+    """Score the auditor output. Raises ModelRetry if score < 9."""
+    _auditor_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: Auditor\nOutput:\n{output.model_dump_json(indent=2)}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
+
+
+@cover_letter_writer_agent.output_validator
+async def _validate_cover_letter_writer(ctx: RunContext[None], output: str) -> str:
+    """Score the cover letter output. Raises ModelRetry if score < 9."""
+    _cover_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: Cover Letter Writer\nOutput:\n{output}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
+
+
+@analyst_agent.output_validator
+async def _validate_analyst(ctx: RunContext[None], output: JobAnalysis) -> JobAnalysis:
+    """Score the job analyst output. Raises ModelRetry if score < 9."""
+    _analyst_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: Job Analyst\nOutput:\n{output.model_dump_json(indent=2)}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output
+
+
+@writer_agent.output_validator
+async def _validate_writer(ctx: RunContext[None], output: CV) -> CV:
+    """Score the writer output. Raises ModelRetry if score < 9."""
+    _writer_qs.last_output = output
+    result = await quality_gate_agent.run(
+        f"Role: CV Writer\nOutput:\n{output.model_dump_json(indent=2)}",
+        usage=ctx.usage,
+    )
+    check = result.output
+    if check.score < 9:
+        raise ModelRetry(
+            f"Score: {check.score}/10. Improvements needed:\n"
+            + "\n".join(f"- {i}" for i in check.improvements)
+        )
+    return output

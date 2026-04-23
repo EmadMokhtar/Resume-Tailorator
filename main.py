@@ -1,114 +1,153 @@
-import argparse
 import asyncio
-import hashlib
 import os
-import sqlite3
-import sys
-from pathlib import Path
 
-from pydantic import ValidationError
-
-from memory.models import MissingOriginalResumeError, ResumeMemoryError
-from memory.parser import PydanticAIResumeParser
-from memory.service import ResumeMemoryService
-from memory.sqlite_repository import SQLiteResumeMemoryRepository
-from models.agents.output import AuditResult, CV
-from utils.markdown_writer import generate_resume
+from models.agents.output import FinalReport
+from utils.markdown_writer import generate_report_markdown, generate_resume
 from workflows import ResumeTailorWorkflow
 
 
-def _job_fingerprint(job_content_file_path: str) -> str:
-    """Return a short deterministic fingerprint derived from job-posting content.
+def _get_company_slug(company_name: str) -> str:
+    """Extract a URL-safe slug from a company name.
 
-    The fingerprint is the first 16 hex characters of the SHA-256 hash of the
-    file content.  If the file cannot be read we fall back to hashing the path
-    itself so the fingerprint remains deterministic even when the file is
-    absent (e.g. in tests that mock the workflow).
+    Args:
+        company_name: The company name to convert.
+
+    Returns:
+        A lowercase slug with spaces replaced by underscores.
     """
-    try:
-        content = Path(job_content_file_path).read_text(encoding="utf-8")
-    except OSError:
-        content = job_content_file_path
-    return hashlib.sha256(content.encode()).hexdigest()[:16]
+    return company_name.replace(" ", "_").lower()
 
 
-async def main(argv: list[str] | None = None) -> None:
-    """Entry point for the Resume Tailorator CLI."""
-    # --- Argument parsing ---
-    arg_parser = argparse.ArgumentParser(
-        description="Tailor your resume to a job posting using AI agents."
+def _print_report_to_console(report: FinalReport) -> None:
+    """Print a compact self-review report summary to stdout."""
+    width = 60
+    print("\n" + "=" * width)
+    print(f"📊 SELF-REVIEW REPORT — {report.company_name} · {report.job_title}")
+    print("=" * width)
+    print(f"🎯 Match Score: {report.match_score}/100 · {report.overall_recommendation}")
+    print(f"📅 Generated: {report.generated_at}")
+    print(
+        f"{'✅' if report.passed else '❌'} Audit: {'Passed' if report.passed else 'Failed'}"
     )
-    arg_parser.add_argument(
-        "--resume-path",
-        default=None,
-        metavar="PATH",
-        help=(
-            "Path to your original resume (Markdown). "
-            "Required on the very first run; omit to reuse the latest stored resume."
-        ),
-    )
-    args = arg_parser.parse_args(argv)
 
-    # --- Paths ---
-    files_path = os.path.join(os.getcwd(), "files")
-    job_content_file_path = os.path.join(files_path, "job_posting.md")
-    db_path = os.path.join(files_path, "resume_memory.sqlite3")
-
-    # --- Memory service setup ---
-    repo = SQLiteResumeMemoryRepository(db_path=db_path)
-    try:
-        parser_adapter = PydanticAIResumeParser()
-        memory_service = ResumeMemoryService(repository=repo, parser=parser_adapter)
-
-        # --- Resolve original resume ---
-        try:
-            resolved = memory_service.resolve_original_resume(path=args.resume_path)
-        except MissingOriginalResumeError as exc:
-            print(f"⚠️ {exc}")
+    print("\nWHAT CHANGED")
+    diff = report.what_changed
+    if not diff.sections_modified:
+        print("  (no significant changes detected)")
+    else:
+        if diff.summary_changed:
+            print("  ✏️  Summary rewritten")
+        if diff.skills_reordered:
+            print(f"  🔼 Skills reordered to top: {', '.join(diff.skills_reordered)}")
+        if diff.skills_deprioritized:
+            print(f"  🔽 Skills deprioritized: {', '.join(diff.skills_deprioritized)}")
+        for exp_change in diff.experience_changes:
             print(
-                "💡 Tip: provide your resume on the first run with "
-                "--resume-path /path/to/resume.md"
+                f"  📝 {exp_change.role} @ {exp_change.company}: "
+                f"{len(exp_change.bullets_rephrased)} bullet(s) rephrased"
             )
-            sys.exit(1)
-        except FileNotFoundError as exc:
-            print(f"⚠️ Resume file not found: {exc}")
-            sys.exit(1)
-        except (ResumeMemoryError, ValidationError, sqlite3.Error) as exc:
-            print(f"⚠️ Failed to resolve original resume: {exc}")
-            sys.exit(1)
 
-        # --- Run the tailoring workflow ---
-        workflow = ResumeTailorWorkflow()
-        result = await workflow.run(
-            resolved.cv, job_content_file_path=job_content_file_path
+    gap = report.gaps
+    total_kw = len(gap.covered_keywords) + len(gap.missing_keywords)
+    print(
+        f"\nKEYWORD COVERAGE: {len(gap.covered_keywords)}/{total_kw} ({gap.keyword_coverage_percent:.1f}%)"
+    )
+    if gap.covered_keywords:
+        print(f"  ✅ Covered: {', '.join(gap.covered_keywords)}")
+    if gap.missing_keywords:
+        print(f"  ❌ Missing: {', '.join(gap.missing_keywords)}")
+
+    print("\nSKILL GAPS (not in your CV)")
+    if gap.missing_hard_skills:
+        print(f"  Hard: {', '.join(gap.missing_hard_skills)}")
+    else:
+        print("  Hard: (none)")
+    if gap.missing_soft_skills:
+        print(f"  Soft: {', '.join(gap.missing_soft_skills)}")
+    else:
+        print("  Soft: (none)")
+
+    print("\nSUGGESTIONS TO STRENGTHEN")
+    for suggestion in report.suggestions_to_strengthen:
+        print(f"  → {suggestion}")
+
+    print(f"\nRECOMMENDATION: {report.overall_recommendation}")
+    # Indent the rationale to 2 spaces
+    for line in report.recommendation_rationale.splitlines():
+        print(f"  {line}")
+
+    print("=" * width)
+
+
+async def main() -> None:
+    """Execute the resume tailoring workflow.
+
+    This function performs the following steps:
+    1. Reads the original resume from files/resume.md
+    2. Loads the job posting from files/job_posting.md
+    3. Runs the ResumeTailorWorkflow to tailor the resume
+    4. If audit passes: saves the tailored CV
+    5. Always: prints and saves the self-review report
+
+    The report is saved to files/report_{company_slug}.md regardless of audit result.
+    If any file is missing or an error occurs, a warning is printed and execution continues.
+    """
+    # --- Inputs ---
+    files_path = os.path.join(os.getcwd(), "files")
+    os.makedirs(files_path, exist_ok=True)
+    job_content_file_path = os.path.join(files_path, "job_posting.md")
+    resume_file_path = os.path.join(files_path, "resume.md")
+    original_cv_text: str = ""
+
+    try:
+        with open(resume_file_path, encoding="utf-8") as f:
+            original_cv_text = f.read()
+    except FileNotFoundError:
+        print(
+            f"⚠️ Resume file not found at {resume_file_path}. Continuing with empty resume."
         )
+    except (IOError, OSError) as e:
+        print(f"⚠️ Error reading resume file: {e}")
 
-        # --- Persist and report results ---
-        if result.passed:
-            fingerprint = _job_fingerprint(job_content_file_path)
+    # Validate job file exists before workflow
+    if not os.path.exists(job_content_file_path):
+        print(
+            f"⚠️ Job posting file not found at {job_content_file_path}. "
+            "Please ensure the file exists before running the workflow."
+        )
+        return
 
-            try:
-                tailored_cv = CV.model_validate_json(result.tailored_resume)
-                audit = AuditResult.model_validate(result.audit_report)
-                memory_service.save_tailored_resume(
-                    source_id=resolved.source.id,
-                    job_fingerprint=fingerprint,
-                    company_name=result.company_name,
-                    job_title=result.job_title,
-                    tailored_cv=tailored_cv,
-                    audit_result=audit,
-                )
-            except (ResumeMemoryError, ValidationError, sqlite3.Error) as exc:
-                print(f"\n⚠️ Failed to save tailored resume: {exc}")
-                sys.exit(1)
+    # Run the workflow
+    workflow = ResumeTailorWorkflow()
+    result = await workflow.run(
+        original_cv_text, job_content_file_path=job_content_file_path
+    )
 
-            print("\n✅ Audit Passed. Saving CV...")
-            generate_resume(result)
-        else:
-            print("\n❌ Audit Failed. Please review the feedback and try again.")
-            print(f"Feedback: {result.audit_report.get('feedback_summary', '')}")
-    finally:
-        repo.close()
+    # Save tailored CV if audit passed
+    if result.passed:
+        print("\n✅ Audit Passed. Saving CV...")
+        generate_resume(result)
+    else:
+        print("\n❌ Audit Failed. Please review the feedback and try again.")
+        feedback = result.audit_report.get("feedback_summary", "No feedback available")
+        print(f"Feedback: {feedback}")
+
+    # Print and save the self-review report (always)
+    if result.final_report is not None:
+        _print_report_to_console(result.final_report)
+
+        report_md = generate_report_markdown(result.final_report)
+        company_slug = _get_company_slug(result.company_name)
+        report_path = os.path.join(files_path, f"report_{company_slug}.md")
+
+        try:
+            with open(report_path, "w", encoding="utf-8") as f:
+                f.write(report_md)
+            print(f"\n📄 Report saved to: {report_path}")
+        except IOError as e:
+            print(f"⚠️ Error writing report file: {e}")
+    else:
+        print("\n⚠️ Self-review report could not be generated.")
 
 
 if __name__ == "__main__":
