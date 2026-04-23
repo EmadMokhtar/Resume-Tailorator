@@ -31,8 +31,21 @@ class ResumeTailorWorkflow:
         pass
 
     async def run(
-        self, resume_text: str, job_content_file_path: str
+        self,
+        resume_text: str,
+        job_content_file_path: str | None = None,
+        job_content: str | None = None,
     ) -> ResumeTailorResult:
+        """Run the resume tailoring workflow.
+
+        Args:
+            resume_text: The resume content as text.
+            job_content_file_path: Path to job posting file (legacy, file-based).
+            job_content: Job posting markdown content (new, direct content).
+
+        Note:
+            If both job_content_file_path and job_content are provided, job_content takes priority.
+        """
         print("🚀 STARTING MULTI-AGENT PIPELINE\n")
 
         total_usage = RunUsage()
@@ -63,10 +76,14 @@ class ResumeTailorWorkflow:
 
             except UnexpectedModelBehavior:
                 if _parser_qs.last_output is not None:
-                    print("⚠️  Resume Parser quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  Resume Parser quality gate exhausted — using best available output"
+                    )
                     original_cv = _parser_qs.last_output
                     break
-                sys.exit("❌ Resume Parser quality gate exhausted with no fallback available.")
+                sys.exit(
+                    "❌ Resume Parser quality gate exhausted with no fallback available."
+                )
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
                 if attempt == self.MAX_RETRIES - 1:
@@ -86,12 +103,23 @@ class ResumeTailorWorkflow:
 
         # --- STEP 1: ANALYZE JOB (Agent 1) ---
         print("🤖 Agent 1 (Analyst): Reading job post...")
+
+        # Determine job content source
+        if job_content:
+            job_analysis_prompt = f"Analyze the following job posting and extract structured job data:\n\n{job_content}"
+        elif job_content_file_path:
+            job_analysis_prompt = f"Analyze the job content located at this file path {job_content_file_path} and extract structured job data."
+        else:
+            sys.exit(
+                "❌ No job content provided. Supply either job_content or job_content_file_path."
+            )
+
         job_analysis_result: AgentRunResult[JobAnalysis] | None = None
         job_analysis: JobAnalysis | None = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 job_analysis_result = await analyst_agent.run(
-                    f"Analyze the job content located at this file path {job_content_file_path} and extract structured job data.",
+                    job_analysis_prompt,
                     usage=total_usage,
                 )
 
@@ -112,10 +140,14 @@ class ResumeTailorWorkflow:
 
             except UnexpectedModelBehavior:
                 if _analyst_qs.last_output is not None:
-                    print("⚠️  Job Analyst quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  Job Analyst quality gate exhausted — using best available output"
+                    )
                     job_analysis = _analyst_qs.last_output
                     break
-                sys.exit("❌ Job Analyst quality gate exhausted with no fallback available.")
+                sys.exit(
+                    "❌ Job Analyst quality gate exhausted with no fallback available."
+                )
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
                 if attempt == self.MAX_RETRIES - 1:
@@ -129,9 +161,7 @@ class ResumeTailorWorkflow:
         print(
             f"   ✅ Job Analyzed: {job_analysis.job_title} at {job_analysis.company_name}"
         )
-        print(
-            f"   🎯 Keywords found: {job_analysis.keywords_to_target}\n"
-        )
+        print(f"   🎯 Keywords found: {job_analysis.keywords_to_target}\n")
 
         job_data_json = job_analysis.model_dump_json()
 
@@ -194,10 +224,14 @@ Rewrite the CV to match the Job Analysis while addressing all audit feedback.
                 new_cv = writer_result.output or None
             except UnexpectedModelBehavior:
                 if _writer_qs.last_output is not None:
-                    print("⚠️  CV Writer quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  CV Writer quality gate exhausted — using best available output"
+                    )
                     new_cv = _writer_qs.last_output
                 else:
-                    print("⚠️  CV Writer quality gate exhausted with no fallback — skipping tailoring")
+                    print(
+                        "⚠️  CV Writer quality gate exhausted with no fallback — skipping tailoring"
+                    )
                     new_cv = None
 
             if new_cv is None:
@@ -317,10 +351,14 @@ Compare the two structured CVs carefully. Ensure that:
                 audit = audit_result.output
             except UnexpectedModelBehavior:
                 if _auditor_qs.last_output is not None:
-                    print("⚠️  Auditor quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  Auditor quality gate exhausted — using best available output"
+                    )
                     audit = _auditor_qs.last_output
                 else:
-                    print("⚠️  Auditor quality gate exhausted with no fallback — skipping audit")
+                    print(
+                        "⚠️  Auditor quality gate exhausted with no fallback — skipping audit"
+                    )
                     audit = None
 
             if audit is None:
@@ -381,7 +419,9 @@ Compare the two structured CVs carefully. Ensure that:
             gap_analysis = compute_gap_analysis(
                 original_cv,
                 new_cv,
-                job_analysis_result.output if job_analysis_result and job_analysis_result.output else JobAnalysis(),
+                job_analysis_result.output
+                if job_analysis_result and job_analysis_result.output
+                else JobAnalysis(),
             )
 
             review_json = review.model_dump_json() if review is not None else "N/A"
