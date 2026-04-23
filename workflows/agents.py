@@ -1,9 +1,52 @@
-from pydantic_ai import Agent
+from typing import Any
 
-from models.agents.output import JobAnalysis, CV, AuditResult, ReviewResult, FinalReport
+from pydantic import BaseModel, ConfigDict
+from pydantic_ai import Agent, ModelRetry, RunContext
+
+from models.agents.output import (
+    AuditResult,
+    CV,
+    JobAnalysis,
+    QualityCheckResult,
+    ReviewResult,
+    FinalReport,
+)
 from tools.playwright import read_job_content_file
 
+
+class _QualityState(BaseModel):
+    """Holds the last output from one pipeline agent for fallback recovery."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    last_output: Any = None
+
+
+_parser_qs = _QualityState()
+_analyst_qs = _QualityState()
+_writer_qs = _QualityState()
+_auditor_qs = _QualityState()
+_cover_qs = _QualityState()
+
 MODLE_NAME = "openai:gpt-5-mini"
+
+# --- Quality Gate Agent ---
+# Universal reviewer: scores any pipeline agent's output 0-10 and requests improvements.
+quality_gate_agent = Agent(
+    MODLE_NAME,
+    system_prompt="""You are a strict Quality Gate Reviewer for a resume tailoring pipeline.
+Score the output of the agent whose role is specified in the prompt, on a scale of 0 to 10.
+Scoring criteria by role:
+  - Resume Parser: completeness, no data loss, correctly structured fields
+  - Job Analyst: keyword coverage, clear requirement identification, no omissions
+  - CV Writer: no hallucinations, ATS keywords incorporated naturally, human tone, no clichés
+  - Auditor: thorough hallucination check, specific cliché identification, actionable feedback
+  - Cover Letter Writer: authentic human voice, no AI clichés, specific to the role, concise
+A score of 9 or 10 means ready to proceed.
+A score below 9 means the output must be improved before the pipeline continues.
+Always provide a reasoning and list specific improvements when score < 9.""",
+    output_type=QualityCheckResult,
+    retries=2,
+)
 
 # --- Agent 0: The Scraper ---
 # Responsibility: Fetch the job posting content.
@@ -17,7 +60,7 @@ scraper_agent = Agent(
     """,
     output_type=JobAnalysis,
     tools=[read_job_content_file],
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 1: The Job Analyst ---
@@ -32,7 +75,7 @@ analyst_agent = Agent(
     """,
     output_type=JobAnalysis,
     tools=[read_job_content_file],
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 1.5: The Resume Parser ---
@@ -53,7 +96,7 @@ resume_parser_agent = Agent(
     7. Include all projects with their descriptions
     """,
     output_type=CV,
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 2: The Writer ---
@@ -78,7 +121,7 @@ writer_agent = Agent(
     10. Group all the skills so that the most relevant skills to the job are at the top of the skills section
     """,
     output_type=CV,
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 3: The Auditor ---
@@ -124,7 +167,7 @@ auditor_agent = Agent(
     Return a detailed structured Audit Result with specific issues and actionable suggestions.
     """,
     output_type=AuditResult,
-    retries=3,
+    retries=5,
 )
 
 # --- Agent 4: The Cover Letter Writer ---
@@ -156,7 +199,7 @@ cover_letter_writer_agent = Agent(
     TONE: Professional but personable. Write like you're explaining to a friend why you're applying.
     """,
     output_type=str,  # or create a CoverLetter pydantic model if you want structured output
-    retries=3,
+    retries=5,
 )
 
 
@@ -197,7 +240,7 @@ reviewer_agent = Agent(
     - strengths (list): What's working well
     """,
     output_type=ReviewResult,  # You'll need to create this model
-    retries=3,
+    retries=5,
 )
 
 
@@ -252,5 +295,5 @@ report_agent = Agent(
     Otherwise set passed to false.
     """,
     output_type=FinalReport,
-    retries=3,
+    retries=5,
 )
