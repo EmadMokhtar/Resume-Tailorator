@@ -127,10 +127,11 @@ class PdfInputConverter:
 class InputConverterRegistry:
     """Maps file extensions to their converter implementations."""
 
-    _converters: dict[str, ResumeConverterProtocol] = {
-        ".docx": DocxInputConverter(),
-        ".pdf": PdfInputConverter(),
-    }
+    def __init__(self) -> None:
+        self._converters: dict[str, ResumeConverterProtocol] = {
+            ".docx": DocxInputConverter(),
+            ".pdf": PdfInputConverter(),
+        }
 
     def get(self, ext: str) -> ResumeConverterProtocol:
         """Return converter for extension. Raises UnsupportedFormatError if unknown."""
@@ -148,8 +149,13 @@ class InputConverterRegistry:
             raise ResumeFileNotFoundError(f"Resume file not found at {input_path}")
         converter = self.get(input_path.suffix)
         markdown = converter.convert(input_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(markdown, encoding="utf-8")
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(markdown, encoding="utf-8")
+        except OSError as exc:
+            raise OutputConversionFailedError(
+                f"Failed to write output file {output_path}: {exc}"
+            ) from exc
         return markdown
 
 
@@ -164,6 +170,8 @@ def auto_detect_resume(files_dir: Path) -> Path:
     Priority: resume.docx > resume.pdf > resume.md
     Raises NoResumeFileFoundError if none exist.
     """
+    if not files_dir.is_dir():
+        raise NoResumeFileFoundError(f"Resume directory does not exist: {files_dir}")
     for name in ("resume.docx", "resume.pdf", "resume.md"):
         candidate = files_dir / name
         if candidate.exists():

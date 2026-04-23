@@ -102,6 +102,11 @@ class TestPdfInputConverter:
         assert isinstance(result, str)
         assert result.strip()
 
+    def test_convert_contains_name_from_document(self, sample_pdf):
+        converter = PdfInputConverter()
+        result = converter.convert(sample_pdf)
+        assert "Jane Smith" in result
+
     def test_convert_raises_conversion_failed_on_corrupt_file(self, tmp_path):
         bad_path = tmp_path / "bad.pdf"
         bad_path.write_bytes(b"not a pdf")
