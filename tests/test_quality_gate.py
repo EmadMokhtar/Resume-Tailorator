@@ -205,3 +205,37 @@ def test_writer_validator_saves_last_output_when_score_low():
     assert _writer_qs.last_output is not None
     assert _writer_qs.last_output.full_name == "Jane Smith"
 
+
+
+# ---------------------------------------------------------------------------
+# Workflow Fallback Handling
+# ---------------------------------------------------------------------------
+
+
+def test_quality_state_objects_are_importable_from_agents():
+    """Verify _QualityState singletons are importable from workflows.agents."""
+    from workflows.agents import _analyst_qs, _auditor_qs, _parser_qs, _writer_qs
+
+    for qs in (_parser_qs, _analyst_qs, _writer_qs, _auditor_qs):
+        assert hasattr(qs, "last_output")
+        assert qs.last_output is None
+
+
+def test_quality_state_accepts_cv_assignment():
+    """Verify _QualityState can store and retrieve CV objects."""
+    from workflows.agents import _parser_qs
+
+    from models.agents.output import CV, WorkExperience
+
+    cv = CV(
+        full_name="Test User",
+        contact_info="test@example.com",
+        summary="Summary text.",
+        skills=["Python"],
+        experience=[
+            WorkExperience(company="X Corp", role="Engineer", dates="2020", highlights=[])
+        ],
+        education=["BSc Computer Science"],
+    )
+    _parser_qs.last_output = cv
+    assert _parser_qs.last_output.full_name == "Test User"

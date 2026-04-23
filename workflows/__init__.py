@@ -2,12 +2,17 @@ import sys
 from datetime import datetime, timezone
 
 from pydantic_ai import AgentRunResult
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.usage import RunUsage
 
 from models.agents.output import CV, CVDiff, FinalReport, JobAnalysis
 from models.workflow import ResumeTailorResult
 from utils.cv_diff import compute_cv_diff, compute_gap_analysis
 from workflows.agents import (
+    _analyst_qs,
+    _auditor_qs,
+    _parser_qs,
+    _writer_qs,
     analyst_agent,
     auditor_agent,
     report_agent,
@@ -35,6 +40,7 @@ class ResumeTailorWorkflow:
         # --- STEP 0: PARSE ORIGINAL RESUME ---
         print("🤖 Agent 0 (Parser): Parsing original resume...")
         original_cv_result: AgentRunResult[CV] | None = None
+        original_cv: CV | None = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 original_cv_result = await resume_parser_agent.run(
@@ -55,15 +61,22 @@ class ResumeTailorWorkflow:
                     f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete resume parse, retrying..."
                 )
 
+            except UnexpectedModelBehavior as e:
+                if _parser_qs.last_output is not None:
+                    print("⚠️  Resume Parser quality gate exhausted — using best available output")
+                    original_cv = _parser_qs.last_output
+                    break
+                sys.exit("❌ Resume Parser quality gate exhausted with no fallback available.")
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
                 if attempt == self.MAX_RETRIES - 1:
                     sys.exit("❌ Failed to parse original resume after retries.")
 
-        if original_cv_result is None or original_cv_result.output is None:
-            sys.exit("❌ Failed to parse original resume after retries.")
+        if original_cv is None:
+            if original_cv_result is None or original_cv_result.output is None:
+                sys.exit("❌ Failed to parse original resume after retries.")
+            original_cv = original_cv_result.output
 
-        original_cv = original_cv_result.output
         print(f"   ✅ Resume Parsed: {original_cv.full_name}")
         print(
             f"   📋 Found {len(original_cv.skills)} skills, {len(original_cv.experience)} work experiences\n"
@@ -74,6 +87,7 @@ class ResumeTailorWorkflow:
         # --- STEP 1: ANALYZE JOB (Agent 1) ---
         print("🤖 Agent 1 (Analyst): Reading job post...")
         job_analysis_result: AgentRunResult[JobAnalysis] | None = None
+        job_analysis: JobAnalysis | None = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 job_analysis_result = await analyst_agent.run(
@@ -96,22 +110,30 @@ class ResumeTailorWorkflow:
                     f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete job data, retrying..."
                 )
 
+            except UnexpectedModelBehavior as e:
+                if _analyst_qs.last_output is not None:
+                    print("⚠️  Job Analyst quality gate exhausted — using best available output")
+                    job_analysis = _analyst_qs.last_output
+                    break
+                sys.exit("❌ Job Analyst quality gate exhausted with no fallback available.")
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
                 if attempt == self.MAX_RETRIES - 1:
                     sys.exit("❌ Failed to get complete job analysis after retries.")
 
-        if job_analysis_result is None or job_analysis_result.output is None:
-            sys.exit("❌ Failed to get complete job analysis after retries.")
+        if job_analysis is None:
+            if job_analysis_result is None or job_analysis_result.output is None:
+                sys.exit("❌ Failed to get complete job analysis after retries.")
+            job_analysis = job_analysis_result.output
 
         print(
-            f"   ✅ Job Analyzed: {job_analysis_result.output.job_title} at {job_analysis_result.output.company_name}"
+            f"   ✅ Job Analyzed: {job_analysis.job_title} at {job_analysis.company_name}"
         )
         print(
-            f"   🎯 Keywords found: {job_analysis_result.output.keywords_to_target}\n"
+            f"   🎯 Keywords found: {job_analysis.keywords_to_target}\n"
         )
 
-        job_data_json = job_analysis_result.output.model_dump_json()
+        job_data_json = job_analysis.model_dump_json()
 
         # --- STEP 2: WRITE + REVIEW + AUDIT LOOP ---
         new_cv: CV | None = None
@@ -167,9 +189,17 @@ CRITICAL RULES:
 Rewrite the CV to match the Job Analysis while addressing all audit feedback.
 """
 
-            writer_result = await writer_agent.run(writer_prompt, usage=total_usage)
+            try:
+                writer_result = await writer_agent.run(writer_prompt, usage=total_usage)
+                new_cv = writer_result.output or None
+            except UnexpectedModelBehavior as e:
+                if _writer_qs.last_output is not None:
+                    print("⚠️  CV Writer quality gate exhausted — using best available output")
+                    new_cv = _writer_qs.last_output
+                else:
+                    print("⚠️  CV Writer quality gate exhausted with no fallback — skipping tailoring")
+                    new_cv = None
 
-            new_cv = writer_result.output or None
             if new_cv is None:
                 if write_attempt == self.max_write_attempts - 1:
                     break  # exhausted retries — report phase still runs below
@@ -282,9 +312,17 @@ Compare the two structured CVs carefully. Ensure that:
 4. The language is professional and not AI-generated sounding
 5. The new CV properly targets the job requirements using only original information
 """
-            audit_result = await auditor_agent.run(audit_prompt, usage=total_usage)
+            try:
+                audit_result = await auditor_agent.run(audit_prompt, usage=total_usage)
+                audit = audit_result.output
+            except UnexpectedModelBehavior as e:
+                if _auditor_qs.last_output is not None:
+                    print("⚠️  Auditor quality gate exhausted — using best available output")
+                    audit = _auditor_qs.last_output
+                else:
+                    print("⚠️  Auditor quality gate exhausted with no fallback — skipping audit")
+                    audit = None
 
-            audit = audit_result.output
             if audit is None:
                 print(f"   ⚠️ Audit result is None on attempt {write_attempt + 1}")
                 if write_attempt < self.max_write_attempts - 1:
