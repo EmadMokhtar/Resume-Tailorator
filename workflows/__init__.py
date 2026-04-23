@@ -11,7 +11,6 @@ from utils.cv_diff import compute_cv_diff, compute_gap_analysis
 from workflows.agents import (
     _analyst_qs,
     _auditor_qs,
-    _cover_qs,
     _parser_qs,
     _writer_qs,
     analyst_agent,
