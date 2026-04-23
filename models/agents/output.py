@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -112,7 +114,7 @@ class FinalReport(BaseModel):
     job_title: str
     company_name: str
     generated_at: str  # ISO 8601 timestamp
-    overall_recommendation: str
+    overall_recommendation: Literal["Strong Match", "Partial Match", "Weak Match"]
     match_score: int = Field(
         ge=0,
         le=100,

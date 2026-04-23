@@ -4,13 +4,10 @@
 # once the Report Phase is wired into workflows/__init__.py.
 
 import pytest
-from pydantic_ai import models
 from pydantic_ai.models.test import TestModel
 from pytest_subtests import SubTests
 
 from models.agents.output import FinalReport
-
-models.ALLOW_MODEL_REQUESTS = False
 
 pytestmark = pytest.mark.anyio
 
@@ -82,3 +79,6 @@ async def test_report_agent_output_has_required_fields(subtests: SubTests) -> No
 
     with subtests.test("rationale_non_empty"):
         assert len(output.recommendation_rationale) > 0
+
+    with subtests.test("passed"):
+        assert output.passed is True

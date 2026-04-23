@@ -237,6 +237,19 @@ report_agent = Agent(
       "tapestry", "dynamic", "innovative", "cutting-edge", "game-changer".
     - Do not repeat the raw JSON back. Synthesise it into human-readable text.
     - Be concise: audit_summary and recommendation_rationale should each be 2-4 sentences.
+
+    You also receive raw structured JSON in the user prompt. For the following fields,
+    copy them VERBATIM from the JSON input — do NOT reinterpret, summarise, or alter them:
+    - what_changed: copy the CVDiff JSON object exactly as provided
+    - gaps: copy the GapAnalysis JSON object exactly as provided
+    - job_title: copy the job title string exactly as provided
+    - company_name: copy the company name string exactly as provided
+    - generated_at: copy the ISO 8601 timestamp string exactly as provided
+
+    For the `passed` field: set it to true if BOTH of the following are true:
+    - AuditResult.passed is true (hallucination_score <= 2 and clique_score <= 2)
+    - overall_recommendation is "Strong Match" or "Partial Match"
+    Otherwise set passed to false.
     """,
     output_type=FinalReport,
     retries=3,
