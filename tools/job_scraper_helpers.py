@@ -93,8 +93,12 @@ def detect_placeholder_content(text: str) -> bool:
     """Detect if text contains placeholder or error indicators.
 
     Checks for common signs that parsing failed or returned incomplete content,
-    including unexecuted JavaScript, placeholder text, very short content, and
-    error messages.
+    including unexecuted HTML/JavaScript code blocks, placeholder text, very short
+    content, and error messages.
+
+    Note: Legitimate mentions of "JavaScript" as a required skill are NOT flagged
+    as placeholders. Only unexecuted code blocks (<script tags) are detected as
+    parsing failures, which is the actual indicator of malformed content.
 
     Args:
         text: Text to check for placeholder/error indicators.
@@ -106,7 +110,9 @@ def detect_placeholder_content(text: str) -> bool:
     Examples:
         >>> detect_placeholder_content("")
         True
-        >>> detect_placeholder_content("JavaScript code")
+        >>> detect_placeholder_content("Senior JavaScript Developer needed")
+        False
+        >>> detect_placeholder_content("<script>alert('error')</script>")
         True
         >>> detect_placeholder_content("Click here to apply")
         True
@@ -119,13 +125,13 @@ def detect_placeholder_content(text: str) -> bool:
         return True
 
     # Check for common placeholders and error indicators
+    # Note: 'javascript' substring removed - legitimate job postings mention JavaScript skills
     placeholders = [
-        r"javascript",
-        r"<script",
-        r"click here",
-        r"error loading",
-        r"page not found",
-        r"404",
+        r"<script",  # Unexecuted HTML/JavaScript code blocks
+        r"click here",  # Common placeholder CTA
+        r"error loading",  # Parsing error indicator
+        r"page not found",  # Parsing error indicator
+        r"404",  # HTTP error code
     ]
 
     text_lower = text.lower()
