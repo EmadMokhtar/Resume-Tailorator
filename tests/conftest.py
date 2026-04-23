@@ -1,5 +1,17 @@
+import os
+
 import pytest
 from pathlib import Path
+
+# Allow OpenAI client to initialise in tests without a real key.
+# pydantic-ai's ALLOW_MODEL_REQUESTS=False prevents actual API calls.
+os.environ.setdefault("OPENAI_API_KEY", "sk-test-dummy")
+
+
+@pytest.fixture(params=["asyncio"])
+def anyio_backend() -> str:
+    """Restrict anyio tests to asyncio backend (trio is not installed)."""
+    return "asyncio"
 
 
 SAMPLE_MARKDOWN = """\
