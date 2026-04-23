@@ -1,4 +1,5 @@
 """Tests for QualityCheckResult model."""
+
 import pytest
 from models.agents.output import QualityCheckResult
 

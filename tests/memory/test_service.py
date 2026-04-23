@@ -521,7 +521,9 @@ def test_resolve_missing_file_raises_file_not_found(tmp_path: Path) -> None:
         svc.resolve_original_resume(path=str(nonexistent))
 
 
-def test_parser_raises_when_agent_returns_no_output(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parser_raises_when_agent_returns_no_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The parser adapter must fail clearly when the agent returns no structured output."""
 
     class _FakeAgent:
