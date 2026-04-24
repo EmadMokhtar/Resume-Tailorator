@@ -93,7 +93,6 @@ Secrets Management:
 - [ ] Secrets in Azure Key Vault (production)
 - [ ] .env for local development only
 - [ ] .env in .gitignore
-- [ ] BuildKit secrets for Artifactory
 - [ ] No secrets in code/comments/logs
 
 Provide:
