@@ -114,7 +114,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-**Note:** This is a generic example. For actual project, see `docker.instructions.md` for project-specific patterns (Artifactory registry, Make commands, ARG RUN_TARGET).
+**Note:** This is a generic example. For actual project, see `docker.instructions.md` for project-specific patterns (Make commands, ARG RUN_TARGET).
 
 ### Kubernetes
 
