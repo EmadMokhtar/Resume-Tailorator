@@ -1,5 +1,6 @@
 """CLI entry point for Resume Tailorator using Typer."""
 
+import asyncio
 import logging
 import os
 
@@ -133,14 +134,13 @@ async def _run_workflow(
     return 0, resume_path, report_path
 
 
-@app.command()
-async def tailor(
-    job_url: str = typer.Argument(..., help="URL of job posting to scrape"),
-    resume_path: str = typer.Argument(..., help="Path to resume (Markdown, DOCX, PDF)"),
-    output_dir: str = typer.Option("./output", help="Directory for output files"),
-    model: str | None = typer.Option(None, help="AI model to use (e.g., openai:gpt-4o-mini)"),
+async def _tailor_impl(
+    job_url: str,
+    resume_path: str,
+    output_dir: str,
+    model: str | None,
 ) -> int:
-    """Run the full resume tailoring workflow."""
+    """Async implementation of tailor command."""
     if not job_url.startswith(("http://", "https://")):
         console.print(f"[red]❌ Error: Job URL must start with http:// or https://. Got: {job_url}[/red]")
         return 1
@@ -227,14 +227,24 @@ async def tailor(
 
 
 @app.command()
-async def re_tailor(
-    job_id: str = typer.Argument(..., help="UUID of prior job"),
-    recommendations: str = typer.Argument(..., help="Comments/recommendations from prior audit"),
-    resume_path: str | None = typer.Option(None, help="Path to resume (uses stored path if omitted)"),
+def tailor(
+    job_url: str = typer.Argument(..., help="URL of job posting to scrape"),
+    resume_path: str = typer.Argument(..., help="Path to resume (Markdown, DOCX, PDF)"),
     output_dir: str = typer.Option("./output", help="Directory for output files"),
-    model: str | None = typer.Option(None, help="AI model to use"),
+    model: str | None = typer.Option(None, help="AI model to use (e.g., openai:gpt-4o-mini)"),
 ) -> int:
-    """Re-run tailoring with recommendations from a prior audit."""
+    """Run the full resume tailoring workflow."""
+    return asyncio.run(_tailor_impl(job_url, resume_path, output_dir, model))
+
+
+async def _re_tailor_impl(
+    job_id: str,
+    recommendations: str,
+    resume_path: str | None,
+    output_dir: str,
+    model: str | None,
+) -> int:
+    """Async implementation of re-tailor command."""
     os.makedirs(output_dir, exist_ok=True)
 
     from resume_tailorator.memory.repository import ResumeMemoryRepository
@@ -313,6 +323,18 @@ async def re_tailor(
         console.print(f"📊 Updated Report: {updated_report_path}")
 
     return 0
+
+
+@app.command()
+def re_tailor(
+    job_id: str = typer.Argument(..., help="UUID of prior job"),
+    recommendations: str = typer.Argument(..., help="Comments/recommendations from prior audit"),
+    resume_path: str | None = typer.Option(None, help="Path to resume (uses stored path if omitted)"),
+    output_dir: str = typer.Option("./output", help="Directory for output files"),
+    model: str | None = typer.Option(None, help="AI model to use"),
+) -> int:
+    """Re-run tailoring with recommendations from a prior audit."""
+    return asyncio.run(_re_tailor_impl(job_id, recommendations, resume_path, output_dir, model))
 
 
 def run():
