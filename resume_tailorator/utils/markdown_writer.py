@@ -1,9 +1,9 @@
 import os
 import json
 
-from models.agents.output import FinalReport
-from models.workflow import ResumeTailorResult
-from utils.pdf_converter import markdown_to_pdf
+from resume_tailorator.models.agents.output import FinalReport
+from resume_tailorator.models.workflow import ResumeTailorResult
+from resume_tailorator.utils.pdf_converter import markdown_to_pdf
 
 
 def generate_resume(result: ResumeTailorResult, output_dir: str = "./output") -> None:

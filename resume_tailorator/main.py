@@ -6,16 +6,16 @@ import os
 import typer
 from rich.console import Console
 
-from models.agents.output import FinalReport, ScrapedJobPosting
-from utils.markdown_writer import generate_report_markdown, generate_resume
-from utils.resume_converter import (
+from resume_tailorator.models.agents.output import FinalReport, ScrapedJobPosting
+from resume_tailorator.utils.markdown_writer import generate_report_markdown, generate_resume
+from resume_tailorator.utils.resume_converter import (
     InputConverterRegistry,
     ResumeFileNotFoundError,
     UnsupportedFormatError,
     ConversionFailedError,
 )
-from workflows import ResumeTailorWorkflow
-from workflows.agents import job_scraper_agent
+from resume_tailorator.workflows import ResumeTailorWorkflow
+from resume_tailorator.workflows.agents import job_scraper_agent
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -237,9 +237,9 @@ async def re_tailor(
     """Re-run tailoring with recommendations from a prior audit."""
     os.makedirs(output_dir, exist_ok=True)
 
-    from memory.repository import ResumeMemoryRepository
-    from memory.parser import ResumeParserAdapter
-    from memory.service import ResumeMemoryService
+    from resume_tailorator.memory.repository import ResumeMemoryRepository
+    from resume_tailorator.memory.parser import ResumeParserAdapter
+    from resume_tailorator.memory.service import ResumeMemoryService
 
     repo = ResumeMemoryRepository()
     parser = ResumeParserAdapter()

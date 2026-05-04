@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     ParsedOriginalResumeRecord,
     ResumeSourceRecord,
     TailoredResumeRecord,

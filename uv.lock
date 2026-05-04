@@ -2545,7 +2545,7 @@ wheels = [
 [[package]]
 name = "resume-tailorator"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "html2text" },

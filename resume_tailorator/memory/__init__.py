@@ -1,6 +1,6 @@
 """Memory subsystem exports."""
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     ResumeMemoryError,
     MissingOriginalResumeError,
     ParsedOriginalResumeRecord,
@@ -8,7 +8,7 @@ from memory.models import (
     ResumeSourceRecord,
     TailoredResumeRecord,
 )
-from memory.repository import ResumeMemoryRepository
+from resume_tailorator.memory.repository import ResumeMemoryRepository
 
 __all__ = [
     "ResumeMemoryError",

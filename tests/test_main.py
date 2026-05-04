@@ -16,15 +16,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import main as main_module
-from memory.models import (
+from resume_tailorator import main as main_module
+from resume_tailorator.memory.models import (
     MissingOriginalResumeError,
     ResolvedOriginalResume,
     ResumeMemoryError,
     ResumeSourceRecord,
 )
-from models.agents.output import CV, WorkExperience
-from models.workflow import ResumeTailorResult
+from resume_tailorator.models.agents.output import CV, WorkExperience
+from resume_tailorator.models.workflow import ResumeTailorResult
 
 
 # ---------------------------------------------------------------------------

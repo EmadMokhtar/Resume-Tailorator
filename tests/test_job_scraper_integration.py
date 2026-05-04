@@ -31,7 +31,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from models.agents.output import (
+from resume_tailorator.models.agents.output import (
     ScrapedJobPosting,
     CV,
     WorkExperience,
@@ -39,7 +39,7 @@ from models.agents.output import (
     CVDiff,
     GapAnalysis,
 )
-from models.workflow import ResumeTailorResult
+from resume_tailorator.models.workflow import ResumeTailorResult
 
 # Pre-patch markdown_pdf to avoid import errors
 sys.modules['markdown_pdf'] = MagicMock()

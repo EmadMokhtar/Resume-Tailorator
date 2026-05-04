@@ -1,7 +1,7 @@
 """Tests for QualityCheckResult model."""
 
 import pytest
-from models.agents.output import QualityCheckResult
+from resume_tailorator.models.agents.output import QualityCheckResult
 
 
 def test_quality_check_result_valid_pass_score(subtests):

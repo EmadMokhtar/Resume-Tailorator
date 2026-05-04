@@ -16,15 +16,15 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     MissingOriginalResumeError,
     ResumeMemoryError,
     ResolvedOriginalResume,
     TailoredResumeRecord,
 )
-from memory.parser import ResumeParserAdapter
-from memory.repository import ResumeMemoryRepository
-from models.agents.output import AuditResult, CV
+from resume_tailorator.memory.parser import ResumeParserAdapter
+from resume_tailorator.memory.repository import ResumeMemoryRepository
+from resume_tailorator.models.agents.output import AuditResult, CV
 
 
 def _hash_content(content: str) -> str:

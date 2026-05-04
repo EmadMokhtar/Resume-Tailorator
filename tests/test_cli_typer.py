@@ -7,9 +7,9 @@ import os
 import pytest
 import typer
 
-import main as main_module
-from models.agents.output import CV, WorkExperience, ScrapedJobPosting
-from models.workflow import ResumeTailorResult
+from resume_tailorator import main as main_module
+from resume_tailorator.models.agents.output import CV, WorkExperience, ScrapedJobPosting
+from resume_tailorator.models.workflow import ResumeTailorResult
 
 pytestmark = pytest.mark.anyio
 
@@ -78,9 +78,9 @@ async def test_taylor_command_success(tmp_path, monkeypatch, subtests) -> None:
     scraped_job = _make_scraped_job()
 
     patches = [
-        patch("main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))),
-        patch("main.ResumeTailorWorkflow", return_value=mock_workflow),
-        patch("main.generate_resume", mock_generate_resume),
+        patch("resume_tailorator.main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))),
+        patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
+        patch("resume_tailorator.main.generate_resume", mock_generate_resume),
     ]
 
     with patches[0], patches[1], patches[2]:
@@ -154,7 +154,7 @@ async def test_taylor_command_scraping_failure(tmp_path, monkeypatch, capsys) ->
 
     mock_scraper = AsyncMock(side_effect=Exception("Network error"))
 
-    with patch("main.job_scraper_agent.run", mock_scraper):
+    with patch("resume_tailorator.main.job_scraper_agent.run", mock_scraper):
         exit_code = await main_module.tailor(
             job_url="https://example.com/job/123",
             resume_path=str(resume_file),
@@ -185,8 +185,8 @@ async def test_taylor_command_failed_audit_exits_zero(tmp_path, monkeypatch, cap
 
     scraped_job = _make_scraped_job()
 
-    with patch("main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))):
-        with patch("main.ResumeTailorWorkflow", return_value=mock_workflow):
+    with patch("resume_tailorator.main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))):
+        with patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow):
             exit_code = await main_module.tailor(
                 job_url="https://example.com/job/123",
                 resume_path=str(resume_file),
@@ -210,7 +210,7 @@ async def test_taylor_command_empty_job_content(tmp_path, monkeypatch, capsys) -
 
     scraped_job = _make_scraped_job(markdown="")
 
-    with patch("main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))):
+    with patch("resume_tailorator.main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))):
         exit_code = await main_module.tailor(
             job_url="https://example.com/job/123",
             resume_path=str(resume_file),
@@ -247,9 +247,9 @@ async def test_taylor_command_docx_conversion(tmp_path, monkeypatch) -> None:
 
     scraped_job = _make_scraped_job()
 
-    with patch("main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))):
-        with patch("main.ResumeTailorWorkflow", return_value=mock_workflow):
-            with patch("main.generate_resume", mock_generate_resume):
+    with patch("resume_tailorator.main.job_scraper_agent.run", AsyncMock(return_value=MagicMock(output=scraped_job))):
+        with patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow):
+            with patch("resume_tailorator.main.generate_resume", mock_generate_resume):
                 exit_code = await main_module.tailor(
                     job_url="https://example.com/job/123",
                     resume_path=str(resume_file),

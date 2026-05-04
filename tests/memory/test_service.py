@@ -26,17 +26,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     MissingOriginalResumeError,
     ParsedOriginalResumeRecord,
     ResumeMemoryError,
     ResumeSourceRecord,
     TailoredResumeRecord,
 )
-from memory.parser import PydanticAIResumeParser, ResumeParserAdapter
-from memory.repository import ResumeMemoryRepository
-from memory.service import ResumeMemoryService
-from models.agents.output import AuditResult, CV, WorkExperience
+from resume_tailorator.memory.parser import PydanticAIResumeParser, ResumeParserAdapter
+from resume_tailorator.memory.repository import ResumeMemoryRepository
+from resume_tailorator.memory.service import ResumeMemoryService
+from resume_tailorator.models.agents.output import AuditResult, CV, WorkExperience
 
 
 def _make_cv(full_name: str = "Jane Doe") -> CV:

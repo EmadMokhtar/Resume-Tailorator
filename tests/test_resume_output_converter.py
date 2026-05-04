@@ -2,12 +2,12 @@ import json
 
 import pytest
 
-from models.workflow import ResumeTailorResult
-from utils.resume_converter import (
+from resume_tailorator.models.workflow import ResumeTailorResult
+from resume_tailorator.utils.resume_converter import (
     OutputConversionFailedError,
     UnsupportedOutputFormatError,
 )
-from utils.resume_output_converter import (
+from resume_tailorator.utils.resume_output_converter import (
     DocxOutputConverter,
     MarkdownOutputConverter,
     OutputConverterRegistry,

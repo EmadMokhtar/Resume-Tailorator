@@ -7,7 +7,7 @@ import pytest
 from pydantic_ai.models.test import TestModel
 from pytest_subtests import SubTests
 
-from models.agents.output import FinalReport
+from resume_tailorator.models.agents.output import FinalReport
 
 pytestmark = pytest.mark.anyio
 

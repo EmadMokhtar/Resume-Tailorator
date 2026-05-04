@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from utils.resume_converter import (
+from resume_tailorator.utils.resume_converter import (
     ConversionFailedError,
     DocxInputConverter,
     EmptyConversionResultError,

@@ -5,12 +5,12 @@ These are pure-Python tests — no LLM calls.
 
 import pytest
 
-from models.agents.output import (
+from resume_tailorator.models.agents.output import (
     CV,
     JobAnalysis,
     WorkExperience,
 )
-from utils.cv_diff import compute_cv_diff, compute_gap_analysis
+from resume_tailorator.utils.cv_diff import compute_cv_diff, compute_gap_analysis
 
 
 # ---------------------------------------------------------------------------

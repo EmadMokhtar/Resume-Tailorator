@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from memory import models as memory_models
+from resume_tailorator.memory import models as memory_models
 
 
 def test_resume_source_record_round_trip() -> None:

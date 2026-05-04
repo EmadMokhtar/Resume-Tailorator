@@ -34,13 +34,13 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     ParsedOriginalResumeRecord,
     ResumeMemoryError,
     ResumeSourceRecord,
     TailoredResumeRecord,
 )
-from memory.repository import ResumeMemoryRepository
+from resume_tailorator.memory.repository import ResumeMemoryRepository
 
 # ---------------------------------------------------------------------------
 # SQL DDL

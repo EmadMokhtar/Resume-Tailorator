@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from models.agents.output import (
+from resume_tailorator.models.agents.output import (
     AuditResult,
     CV,
     JobAnalysis,
@@ -13,8 +13,8 @@ from models.agents.output import (
     FinalReport,
     ScrapedJobPosting,
 )
-from tools.playwright import read_job_content_file
-from tools.job_scraper_helpers import (
+from resume_tailorator.tools.playwright import read_job_content_file
+from resume_tailorator.tools.job_scraper_helpers import (
     detect_placeholder_content,
 )
 

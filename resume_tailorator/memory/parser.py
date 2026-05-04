@@ -13,7 +13,7 @@ to avoid requiring an ``OPENAI_API_KEY`` at import time (tests use a fake).
 
 from abc import ABC, abstractmethod
 
-from models.agents.output import CV
+from resume_tailorator.models.agents.output import CV
 
 _PARSER_VERSION = "1.0.0"
 
@@ -77,7 +77,7 @@ class PydanticAIResumeParser(ResumeParserAdapter):
             TypeError: If the agent returns a payload that is not a ``CV``.
         """
         # Lazy import to avoid OpenAI client instantiation at module load time.
-        from workflows.agents import resume_parser_agent  # noqa: PLC0415
+        from resume_tailorator.workflows.agents import resume_parser_agent  # noqa: PLC0415
 
         result = resume_parser_agent.run_sync(content)
         output = result.output

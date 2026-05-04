@@ -2,8 +2,8 @@
 
 import pytest
 
-from models.agents.output import AuditResult, JobAnalysis, ReviewResult
-from workflows import ResumeTailorWorkflow
+from resume_tailorator.models.agents.output import AuditResult, JobAnalysis, ReviewResult
+from resume_tailorator.workflows import ResumeTailorWorkflow
 
 
 class DummyRunResult:
