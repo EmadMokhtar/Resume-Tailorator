@@ -6,17 +6,19 @@ from models.workflow import ResumeTailorResult
 from utils.pdf_converter import markdown_to_pdf
 
 
-def generate_resume(result: ResumeTailorResult) -> None:
+def generate_resume(result: ResumeTailorResult, output_dir: str = "./output") -> None:
     """
-    Convert Markdown content to PDF with professional styling.
+    Convert tailored CV to Markdown, PDF, and DOCX formats.
 
     Args:
         result: ResumeTailorResult object containing tailored resume and company name
+        output_dir: Directory to save output files.
     """
-    files_path = os.path.join(os.getcwd(), "files")
+    os.makedirs(output_dir, exist_ok=True)
     base_filename = f"tailored_resume_{result.company_name}"
-    md_output_path = os.path.join(files_path, f"{base_filename}.md")
-    pdf_output_path = os.path.join(files_path, f"{base_filename}.pdf")
+    md_output_path = os.path.join(output_dir, f"{base_filename}.md")
+    pdf_output_path = os.path.join(output_dir, f"{base_filename}.pdf")
+    docx_output_path = os.path.join(output_dir, f"{base_filename}.docx")
 
     # Parse the CV JSON back to CV object
     cv_data = json.loads(result.tailored_resume)
@@ -71,8 +73,28 @@ def generate_resume(result: ResumeTailorResult) -> None:
     # Save PDF
     markdown_to_pdf(markdown_text, pdf_output_path)
 
+    # Save DOCX
+    try:
+        from docx import Document
+
+        doc = Document()
+        for line in markdown_text.split("\n"):
+            if line.startswith("# "):
+                doc.add_heading(line[2:].strip(), level=1)
+            elif line.startswith("## "):
+                doc.add_heading(line[3:].strip(), level=2)
+            elif line.startswith("### "):
+                doc.add_heading(line[4:].strip(), level=3)
+            elif line.startswith("- "):
+                doc.add_paragraph(line[2:].strip(), style="List Bullet")
+            elif line.strip():
+                doc.add_paragraph(line.strip())
+        doc.save(docx_output_path)
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to save DOCX: {e}")
+
     print(
-        f"✅ Tailored CV saved to:\n   - Markdown: {md_output_path}\n   - PDF: {pdf_output_path}"
+        f"✅ Tailored CV saved to:\n   - Markdown: {md_output_path}\n   - PDF: {pdf_output_path}\n   - DOCX: {docx_output_path}"
     )
 
 

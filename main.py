@@ -1,9 +1,20 @@
+import argparse
 import asyncio
+import logging
 import os
 
-from models.agents.output import FinalReport
+from models.agents.output import FinalReport, ScrapedJobPosting
 from utils.markdown_writer import generate_report_markdown, generate_resume
+from utils.resume_converter import (
+    InputConverterRegistry,
+    ResumeFileNotFoundError,
+    UnsupportedFormatError,
+    ConversionFailedError,
+)
 from workflows import ResumeTailorWorkflow
+from workflows.agents import job_scraper_agent
+
+logger = logging.getLogger(__name__)
 
 
 def _get_company_slug(company_name: str) -> str:
@@ -79,54 +90,114 @@ def _print_report_to_console(report: FinalReport) -> None:
     print("=" * width)
 
 
-async def main() -> None:
+def _validate_job_url(url: str) -> bool:
+    """Validate that a job URL has proper format."""
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"Job URL must start with http:// or https://. Got: {url}")
+    return True
+
+
+async def main(job_url: str | None = None, resume_path: str | None = None, output_dir: str = "./output", model: str | None = None) -> None:
     """Execute the resume tailoring workflow.
 
-    This function performs the following steps:
-    1. Reads the original resume from files/resume.md
-    2. Loads the job posting from files/job_posting.md
-    3. Runs the ResumeTailorWorkflow to tailor the resume
-    4. If audit passes: saves the tailored CV
-    5. Always: prints and saves the self-review report
-
-    The report is saved to files/report_{company_slug}.md regardless of audit result.
-    If any file is missing or an error occurs, a warning is printed and execution continues.
+    Args:
+        job_url: Optional URL to scrape job posting from.
+        resume_path: Optional path to the original resume (Markdown or DOCX).
+        output_dir: Directory to save output files.
+        model: AI model to use (e.g., openai:gpt-4o-mini).
     """
-    # --- Inputs ---
-    files_path = os.path.join(os.getcwd(), "files")
-    os.makedirs(files_path, exist_ok=True)
-    job_content_file_path = os.path.join(files_path, "job_posting.md")
-    resume_file_path = os.path.join(files_path, "resume.md")
-    original_cv_text: str = ""
+    os.makedirs(output_dir, exist_ok=True)
 
-    try:
-        with open(resume_file_path, encoding="utf-8") as f:
-            original_cv_text = f.read()
-    except FileNotFoundError:
-        print(
-            f"⚠️ Resume file not found at {resume_file_path}. Continuing with empty resume."
-        )
-    except (IOError, OSError) as e:
-        print(f"⚠️ Error reading resume file: {e}")
+    # --- Load resume content ---
+    resume_content: str = ""
+    if resume_path:
+        resume_path = os.path.expanduser(resume_path)
+        resume_ext = os.path.splitext(resume_path)[1].lower()
 
-    # Validate job file exists before workflow
-    if not os.path.exists(job_content_file_path):
-        print(
-            f"⚠️ Job posting file not found at {job_content_file_path}. "
-            "Please ensure the file exists before running the workflow."
-        )
+        if not os.path.exists(resume_path):
+            print(f"❌ Resume file not found at {resume_path}")
+            return
+
+        if resume_ext in (".docx", ".pdf"):
+            try:
+                registry = InputConverterRegistry()
+                resume_content = registry.get(resume_ext).convert(resume_path)
+                print(f"✅ Resume converted from {resume_ext} file")
+                converted_resume_path = os.path.join(output_dir, "resume_converted.md")
+                with open(converted_resume_path, "w", encoding="utf-8") as f:
+                    f.write(resume_content)
+                print(f"📄 Converted resume saved to: {converted_resume_path}")
+            except (UnsupportedFormatError, ConversionFailedError) as e:
+                print(f"❌ Failed to convert resume: {e}")
+                return
+            except ResumeFileNotFoundError as e:
+                print(f"❌ Resume file not found: {e}")
+                return
+        else:
+            try:
+                with open(resume_path, encoding="utf-8") as f:
+                    resume_content = f.read()
+            except (IOError, OSError) as e:
+                print(f"❌ Error reading resume file: {e}")
+                return
+
+        print(f"✅ Resume loaded from {resume_path}")
+
+    if not resume_content.strip():
+        print("❌ Resume content is empty")
         return
 
-    # Run the workflow
+    # --- Scrape job posting ---
+    job_posting_markdown: str = ""
+    if job_url:
+        try:
+            _validate_job_url(job_url)
+        except ValueError as e:
+            print(f"❌ Error: {e}")
+            return
+
+        logger.info("scraping_job_posting", extra={"url": job_url})
+        try:
+            scrape_result = await job_scraper_agent.run(
+                f"Extract and convert to Markdown this job posting: {job_url}",
+            )
+            if isinstance(scrape_result.output, ScrapedJobPosting):
+                job_posting_markdown = scrape_result.output.markdown
+                if not job_posting_markdown.strip():
+                    logger.error("job_posting_scraped_but_empty", extra={"url": job_url})
+                    print("❌ Job posting scraped but content is empty")
+                    return
+                logger.info(
+                    "job_posting_scraped_successfully",
+                    extra={"url": job_url, "content_length": len(job_posting_markdown)},
+                )
+                print(f"✅ Job posting scraped successfully from {job_url}")
+            else:
+                print(f"⚠️ Unexpected scraper output type: {type(scrape_result.output)}")
+                return
+        except Exception as e:
+            logger.error(
+                "job_posting_scraping_failed", extra={"url": job_url, "error": str(e)}
+            )
+            print(f"❌ Failed to scrape job posting from URL: {e}")
+            print("💡 Tip: Ensure the URL is publicly accessible and contains a valid job posting.")
+            return
+    else:
+        print("❌ No job URL provided")
+        return
+
+    # --- Run the workflow ---
     workflow = ResumeTailorWorkflow()
     result = await workflow.run(
-        original_cv_text, job_content_file_path=job_content_file_path
+        resume_content,
+        job_content=job_posting_markdown,
+        model=model,
     )
 
     # Save tailored CV if audit passed
     if result.passed:
         print("\n✅ Audit Passed. Saving CV...")
-        generate_resume(result)
+        generate_resume(result, output_dir=output_dir)
     else:
         print("\n❌ Audit Failed. Please review the feedback and try again.")
         feedback = result.audit_report.get("feedback_summary", "No feedback available")
@@ -138,7 +209,7 @@ async def main() -> None:
 
         report_md = generate_report_markdown(result.final_report)
         company_slug = _get_company_slug(result.company_name)
-        report_path = os.path.join(files_path, f"report_{company_slug}.md")
+        report_path = os.path.join(output_dir, f"report_{company_slug}.md")
 
         try:
             with open(report_path, "w", encoding="utf-8") as f:
@@ -151,4 +222,35 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(
+        description="Resume Tailorator - Tailor your resume for any job"
+    )
+    parser.add_argument(
+        "--job-url",
+        default=None,
+        metavar="URL",
+        help="URL of the job posting to scrape.",
+    )
+    parser.add_argument(
+        "--resume-path",
+        default=None,
+        metavar="PATH",
+        help="Path to your original resume (Markdown or DOCX).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        metavar="DIR",
+        help="Directory to save the output report (default: ./output).",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        metavar="MODEL",
+        help="AI model to use (e.g., openai:gpt-4o-mini, anthropic:claude-sonnet-4).",
+    )
+    args = parser.parse_args()
+
+    output_dir = args.output_dir or "./output"
+
+    asyncio.run(main(job_url=args.job_url, resume_path=args.resume_path, output_dir=output_dir, model=args.model))

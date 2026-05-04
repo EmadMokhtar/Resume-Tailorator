@@ -27,49 +27,25 @@ def validate_file(filepath, file_description, default_values):
     return True
 
 
-def validate_job_url(job_url: str) -> None:
-    """Validate that a job URL has proper format.
+def validate_job_url(job_url):
+    """Validate job URL format.
 
     Args:
         job_url: The URL to validate.
 
+    Returns:
+        bool: True if URL is valid, False otherwise.
+
     Raises:
-        ValueError: If URL format is invalid.
+        ValueError: If URL is invalid.
     """
+    if not job_url:
+        return False
+
     if not job_url.startswith(("http://", "https://")):
         raise ValueError(f"Job URL must start with http:// or https://. Got: {job_url}")
 
-
-def validate_inputs(args) -> tuple[str | None, str, str | None]:
-    """Validate CLI inputs and job URL.
-
-    Args:
-        args: Parsed arguments from argparse.
-
-    Returns:
-        Tuple of (resume_path_or_none, output_formats_str, job_url_or_none)
-    """
-    # Extract resume path
-    resume_path = args.resume_path
-
-    # Extract output formats (default to "md")
-    output_formats = ",".join(args.output) if args.output else "md"
-
-    # Job URL handling: check CLI arg first, then environment variable
-    job_url = args.job_url or os.getenv("JOB_URL")
-    if job_url:
-        try:
-            validate_job_url(job_url)  # Raises ValueError if invalid
-            source = "cli_arg" if args.job_url else "env_var"
-            logger.info(f"job_url_provided from {source}")
-        except ValueError as e:
-            print(f"❌ Error: {e}")
-            sys.exit(1)
-    else:
-        logger.info("job_url_not_provided")
-
-    # Return the required tuple
-    return resume_path, output_formats, job_url
+    return True
 
 
 def main():
@@ -89,26 +65,20 @@ def main():
     )
     parser.add_argument(
         "--job-url",
+        type=str,
         default=None,
         metavar="URL",
         help=(
             "URL of the job posting to scrape. "
-            "When provided, the URL is fetched and converted to Markdown. "
-            "Takes precedence over files/job_posting.md if both exist. "
-            "Can also be set via JOB_URL environment variable."
+            "Priority: CLI > JOB_URL env var > markdown file. "
+            "Must start with http:// or https://."
         ),
-    )
-    parser.add_argument(
-        "--output",
-        action="append",
-        choices=["md", "pdf", "docx"],
-        metavar="FORMAT",
-        help="Output format: md, pdf, or docx. Repeatable. Default: md.",
     )
     args = parser.parse_args()
 
     base_dir = os.getcwd()
     files_dir = os.path.join(base_dir, "files")
+
     job_posting_path = os.path.join(files_dir, "job_posting.md")
 
     # Define default values that should trigger an error
@@ -126,20 +96,36 @@ def main():
         "[Company Name]",
     ]
 
-    # Only validate job posting file if URL not provided
-    if args.job_url is None and os.getenv("JOB_URL") is None:
-        valid_job = validate_file(job_posting_path, "Job posting file", job_defaults)
-        if not valid_job:
+    valid_job = validate_file(job_posting_path, "Job posting file", job_defaults)
+
+    # Handle job URL (CLI > env var > None)
+    job_url = args.job_url or os.getenv("JOB_URL")
+
+    if job_url:
+        try:
+            validate_job_url(job_url)
+            source = "cli_arg" if args.job_url else "env_var"
+            logger.info(f"Job URL provided from {source}: {job_url}")
+            print(f"✅ Job URL provided: {job_url}")
+        except ValueError as e:
+            print(f"❌ Error: {e}")
             sys.exit(1)
     else:
-        print("⏭️  Job URL provided; skipping job_posting.md validation")
+        logger.info("Job URL not provided. Will use markdown job content from file.")
+        print("ℹ️ Job URL not provided. Using markdown job posting file.")
 
     if args.resume_path is not None:
         valid_resume = validate_file(args.resume_path, "Resume file", resume_defaults)
-        if not valid_resume:
+        if not (valid_resume and valid_job):
+            sys.exit(1)
+    else:
+        if not valid_job:
             sys.exit(1)
 
-    print("✅ Input validation successful.")
+    print("✅ Input files validated successfully.")
+
+    # Return tuple with job_url
+    return job_posting_path, args.resume_path, job_url
 
 
 if __name__ == "__main__":

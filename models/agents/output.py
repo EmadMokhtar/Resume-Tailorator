@@ -137,3 +137,19 @@ class QualityCheckResult(BaseModel):
         default_factory=list,
         description="Concrete improvements needed if score < 9.",
     )
+
+
+class ScrapedJobPosting(BaseModel):
+    """Scraped and extracted job posting content.
+
+    Attributes:
+        url: The original job posting URL.
+        markdown: Cleaned job posting content in Markdown format.
+        source_text: Raw extracted text before markdown conversion.
+        extraction_strategy: Strategy used (e.g., 'playwright_llm', 'markitdown', 'html2text').
+    """
+
+    url: str
+    markdown: str
+    source_text: str
+    extraction_strategy: str

@@ -1,4 +1,5 @@
 """Tests for per-agent quality gate validators."""
+
 import logging
 
 import pytest
@@ -62,7 +63,9 @@ def test_resume_parser_validator_passes_when_score_9():
     from workflows.agents import quality_gate_agent, resume_parser_agent
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
-        with resume_parser_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
+        with resume_parser_agent.override(
+            model=TestModel(custom_output_args=SAMPLE_CV)
+        ):
             result = resume_parser_agent.run_sync("Parse this resume.")
 
     assert result.output.full_name == "Jane Smith"
@@ -72,7 +75,9 @@ def test_resume_parser_validator_saves_last_output_when_score_low():
     from workflows.agents import _parser_qs, quality_gate_agent, resume_parser_agent
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
-        with resume_parser_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
+        with resume_parser_agent.override(
+            model=TestModel(custom_output_args=SAMPLE_CV)
+        ):
             with pytest.raises(UnexpectedModelBehavior):
                 resume_parser_agent.run_sync("Parse this resume.")
 
@@ -126,17 +131,25 @@ def test_cover_letter_validator_passes_when_score_9():
     from workflows.agents import cover_letter_writer_agent, quality_gate_agent
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
-        with cover_letter_writer_agent.override(model=TestModel(custom_output_text=SAMPLE_COVER_LETTER)):
+        with cover_letter_writer_agent.override(
+            model=TestModel(custom_output_text=SAMPLE_COVER_LETTER)
+        ):
             result = cover_letter_writer_agent.run_sync("Write a cover letter.")
 
     assert "Dear Hiring Manager" in result.output
 
 
 def test_cover_letter_validator_saves_last_output_when_score_low():
-    from workflows.agents import _cover_qs, cover_letter_writer_agent, quality_gate_agent
+    from workflows.agents import (
+        _cover_qs,
+        cover_letter_writer_agent,
+        quality_gate_agent,
+    )
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
-        with cover_letter_writer_agent.override(model=TestModel(custom_output_text=SAMPLE_COVER_LETTER)):
+        with cover_letter_writer_agent.override(
+            model=TestModel(custom_output_text=SAMPLE_COVER_LETTER)
+        ):
             with pytest.raises(UnexpectedModelBehavior):
                 cover_letter_writer_agent.run_sync("Write a cover letter.")
 
@@ -208,7 +221,6 @@ def test_writer_validator_saves_last_output_when_score_low():
     assert _writer_qs.last_output.full_name == "Jane Smith"
 
 
-
 # ---------------------------------------------------------------------------
 # Workflow Fallback Handling
 # ---------------------------------------------------------------------------
@@ -228,7 +240,9 @@ def test_workflow_fallback_uses_saved_output_when_parser_retries_exhausted(caplo
     # This test verifies that the output was saved.
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
-        with resume_parser_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
+        with resume_parser_agent.override(
+            model=TestModel(custom_output_args=SAMPLE_CV)
+        ):
             with caplog.at_level(logging.INFO):
                 with pytest.raises(UnexpectedModelBehavior):
                     resume_parser_agent.run_sync("Parse this resume.")
@@ -253,7 +267,9 @@ def test_workflow_fallback_logs_warning_when_using_saved_output():
 
     # Setup: Quality gate will fail all retries (score < 9)
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
-        with resume_parser_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
+        with resume_parser_agent.override(
+            model=TestModel(custom_output_args=SAMPLE_CV)
+        ):
             # When validator exhausts retries, it raises UnexpectedModelBehavior
             # but AFTER saving the output to _parser_qs.last_output
             with pytest.raises(UnexpectedModelBehavior):
@@ -289,7 +305,9 @@ def test_quality_state_accepts_cv_assignment():
         summary="Summary text.",
         skills=["Python"],
         experience=[
-            WorkExperience(company="X Corp", role="Engineer", dates="2020", highlights=[])
+            WorkExperience(
+                company="X Corp", role="Engineer", dates="2020", highlights=[]
+            )
         ],
         education=["BSc Computer Science"],
     )

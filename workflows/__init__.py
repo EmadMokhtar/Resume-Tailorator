@@ -19,6 +19,8 @@ from workflows.agents import (
     resume_parser_agent,
     reviewer_agent,
     writer_agent,
+    get_model,
+    set_model,
 )
 
 
@@ -27,17 +29,90 @@ class ResumeTailorWorkflow:
     max_review_iterations = 3
     max_write_attempts = 3
 
+    # Pipeline stages for status tracking
+    STAGES = [
+        "PARSING_RESUME",
+        "ANALYZING_JOB",
+        "WRITING_CV",
+        "REVIEWING_CV",
+        "AUDITING_CV",
+        "GENERATING_REPORT",
+    ]
+
     def __init__(self):
-        pass
+        self._current_stage: str | None = None
+        self._stage_status: dict[str, str] = {stage: "pending" for stage in self.STAGES}
+
+    def _set_stage(self, stage: str) -> None:
+        """Mark current stage as running, previous as done."""
+        if self._current_stage and self._current_stage in self._stage_status:
+            if self._stage_status[self._current_stage] == "running":
+                self._stage_status[self._current_stage] = "done"
+        self._current_stage = stage
+        if stage in self._stage_status:
+            self._stage_status[stage] = "running"
+
+    def _complete_stage(self, stage: str, success: bool = True) -> None:
+        """Mark a stage as completed or failed."""
+        if stage in self._stage_status:
+            self._stage_status[stage] = "failed" if not success else "done"
+
+    def _print_pipeline_status(self) -> None:
+        """Print current pipeline status."""
+        print("\n" + "=" * 50)
+        print("📊 PIPELINE STATUS")
+        print("=" * 50)
+        icons = {"pending": "⏳", "running": "🔄", "done": "✅", "failed": "❌"}
+        labels = {
+            "PARSING_RESUME": "Parse Resume",
+            "ANALYZING_JOB": "Analyze Job",
+            "WRITING_CV": "Write CV",
+            "REVIEWING_CV": "Review CV",
+            "AUDITING_CV": "Audit CV",
+            "GENERATING_REPORT": "Generate Report",
+        }
+        for stage in self.STAGES:
+            status = self._stage_status[stage]
+            icon = icons.get(status, "?")
+            label = labels.get(stage, stage)
+            current_marker = "→" if (stage == self._current_stage and status == "running") else " "
+            print(f"  {current_marker}{icon} {label}: {status.upper()}")
+        print("=" * 50 + "\n")
 
     async def run(
-        self, resume_text: str, job_content_file_path: str
+        self,
+        resume_text: str,
+        job_content_file_path: str | None = None,
+        job_content: str | None = None,
+        model: str | None = None,
     ) -> ResumeTailorResult:
+        """Run the resume tailoring workflow.
+
+        Args:
+            resume_text: The resume content as text.
+            job_content_file_path: Path to job posting file (legacy, file-based).
+            job_content: Job posting markdown content (new, direct content).
+            model: AI model override (e.g., openai:gpt-4o-mini).
+
+        Note:
+            If both job_content_file_path and job_content are provided, job_content takes priority.
+        """
+        # Override model if specified
+        if model:
+            set_model(model)
+            print(f"🤖 Using model: {model}")
+        else:
+            print(f"🤖 Using model: {get_model()}")
+
         print("🚀 STARTING MULTI-AGENT PIPELINE\n")
+        self._print_pipeline_status()
+
+        total_usage = RunUsage()
 
         total_usage = RunUsage()
 
         # --- STEP 0: PARSE ORIGINAL RESUME ---
+        self._set_stage("PARSING_RESUME")
         print("🤖 Agent 0 (Parser): Parsing original resume...")
         original_cv_result: AgentRunResult[CV] | None = None
         original_cv: CV | None = None
@@ -63,20 +138,28 @@ class ResumeTailorWorkflow:
 
             except UnexpectedModelBehavior:
                 if _parser_qs.last_output is not None:
-                    print("⚠️  Resume Parser quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  Resume Parser quality gate exhausted — using best available output"
+                    )
                     original_cv = _parser_qs.last_output
                     break
-                sys.exit("❌ Resume Parser quality gate exhausted with no fallback available.")
+                self._complete_stage("PARSING_RESUME", success=False)
+                sys.exit(
+                    "❌ Resume Parser quality gate exhausted with no fallback available."
+                )
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
                 if attempt == self.MAX_RETRIES - 1:
+                    self._complete_stage("PARSING_RESUME", success=False)
                     sys.exit("❌ Failed to parse original resume after retries.")
 
         if original_cv is None:
             if original_cv_result is None or original_cv_result.output is None:
+                self._complete_stage("PARSING_RESUME", success=False)
                 sys.exit("❌ Failed to parse original resume after retries.")
             original_cv = original_cv_result.output
 
+        self._complete_stage("PARSING_RESUME")
         print(f"   ✅ Resume Parsed: {original_cv.full_name}")
         print(
             f"   📋 Found {len(original_cv.skills)} skills, {len(original_cv.experience)} work experiences\n"
@@ -85,13 +168,26 @@ class ResumeTailorWorkflow:
         original_cv_json = original_cv.model_dump_json()
 
         # --- STEP 1: ANALYZE JOB (Agent 1) ---
+        self._set_stage("ANALYZING_JOB")
         print("🤖 Agent 1 (Analyst): Reading job post...")
+
+        # Determine job content source
+        if job_content:
+            job_analysis_prompt = f"Analyze the following job posting and extract structured job data:\n\n{job_content}"
+        elif job_content_file_path:
+            job_analysis_prompt = f"Analyze the job content located at this file path {job_content_file_path} and extract structured job data."
+        else:
+            self._complete_stage("ANALYZING_JOB", success=False)
+            sys.exit(
+                "❌ No job content provided. Supply either job_content or job_content_file_path."
+            )
+
         job_analysis_result: AgentRunResult[JobAnalysis] | None = None
         job_analysis: JobAnalysis | None = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 job_analysis_result = await analyst_agent.run(
-                    f"Analyze the job content located at this file path {job_content_file_path} and extract structured job data.",
+                    job_analysis_prompt,
                     usage=total_usage,
                 )
 
@@ -112,36 +208,45 @@ class ResumeTailorWorkflow:
 
             except UnexpectedModelBehavior:
                 if _analyst_qs.last_output is not None:
-                    print("⚠️  Job Analyst quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  Job Analyst quality gate exhausted — using best available output"
+                    )
                     job_analysis = _analyst_qs.last_output
                     break
-                sys.exit("❌ Job Analyst quality gate exhausted with no fallback available.")
+                self._complete_stage("ANALYZING_JOB", success=False)
+                sys.exit(
+                    "❌ Job Analyst quality gate exhausted with no fallback available."
+                )
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
                 if attempt == self.MAX_RETRIES - 1:
+                    self._complete_stage("ANALYZING_JOB", success=False)
                     sys.exit("❌ Failed to get complete job analysis after retries.")
 
         if job_analysis is None:
             if job_analysis_result is None or job_analysis_result.output is None:
+                self._complete_stage("ANALYZING_JOB", success=False)
                 sys.exit("❌ Failed to get complete job analysis after retries.")
             job_analysis = job_analysis_result.output
 
+        self._complete_stage("ANALYZING_JOB")
         print(
             f"   ✅ Job Analyzed: {job_analysis.job_title} at {job_analysis.company_name}"
         )
-        print(
-            f"   🎯 Keywords found: {job_analysis.keywords_to_target}\n"
-        )
+        print(f"   🎯 Keywords found: {job_analysis.keywords_to_target}\n")
+        self._print_pipeline_status()
 
         job_data_json = job_analysis.model_dump_json()
 
         # --- STEP 2: WRITE + REVIEW + AUDIT LOOP ---
+        self._set_stage("WRITING_CV")
         new_cv: CV | None = None
         audit = None
         review = None
         audit_passed = False
 
         for write_attempt in range(self.max_write_attempts):
+            self._set_stage("WRITING_CV")
             print(
                 f"🤖 Agent 2 (Writer): Tailoring CV (Attempt {write_attempt + 1}/{self.max_write_attempts})..."
             )
@@ -194,20 +299,27 @@ Rewrite the CV to match the Job Analysis while addressing all audit feedback.
                 new_cv = writer_result.output or None
             except UnexpectedModelBehavior:
                 if _writer_qs.last_output is not None:
-                    print("⚠️  CV Writer quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  CV Writer quality gate exhausted — using best available output"
+                    )
                     new_cv = _writer_qs.last_output
                 else:
-                    print("⚠️  CV Writer quality gate exhausted with no fallback — skipping tailoring")
+                    print(
+                        "⚠️  CV Writer quality gate exhausted with no fallback — skipping tailoring"
+                    )
                     new_cv = None
 
             if new_cv is None:
                 if write_attempt == self.max_write_attempts - 1:
+                    self._complete_stage("WRITING_CV", success=False)
                     break  # exhausted retries — report phase still runs below
                 continue
 
+            self._complete_stage("WRITING_CV")
             print(f"   ✅ CV Drafted. Summary: {new_cv.summary[:100]}...\n")
 
             # --- STEP 2.5: QUALITY REVIEW (Agent 2.5) ---
+            self._set_stage("REVIEWING_CV")
             for review_iteration in range(self.max_review_iterations):
                 print(
                     f"🤖 Agent 2.5 (Reviewer): Checking CV quality (Iteration {review_iteration + 1}/{self.max_review_iterations})..."
@@ -288,6 +400,7 @@ Focus on better highlighting relevant experience and incorporating job keywords 
                     break
 
             # --- STEP 3: AUDIT (Agent 3) ---
+            self._set_stage("AUDITING_CV")
             new_cv_json = (
                 new_cv.model_dump_json()
                 if hasattr(new_cv, "model_dump_json")
@@ -317,23 +430,30 @@ Compare the two structured CVs carefully. Ensure that:
                 audit = audit_result.output
             except UnexpectedModelBehavior:
                 if _auditor_qs.last_output is not None:
-                    print("⚠️  Auditor quality gate exhausted — using best available output")
+                    print(
+                        "⚠️  Auditor quality gate exhausted — using best available output"
+                    )
                     audit = _auditor_qs.last_output
                 else:
-                    print("⚠️  Auditor quality gate exhausted with no fallback — skipping audit")
+                    print(
+                        "⚠️  Auditor quality gate exhausted with no fallback — skipping audit"
+                    )
                     audit = None
 
             if audit is None:
                 print(f"   ⚠️ Audit result is None on attempt {write_attempt + 1}")
+                self._complete_stage("AUDITING_CV", success=False)
                 if write_attempt < self.max_write_attempts - 1:
                     print("   🔄 Will retry...\n")
                     continue
                 else:
+                    self._complete_stage("AUDITING_CV", success=False)
                     print("   ❌ Max attempts reached\n")
                     break
 
             audit_passed = getattr(audit, "passed", False)
             if audit_passed:
+                self._complete_stage("AUDITING_CV")
                 print(f"   ✅ Audit passed on attempt {write_attempt + 1}!\n")
                 break  # exit loop — report phase runs below
             else:
@@ -341,6 +461,7 @@ Compare the two structured CVs carefully. Ensure that:
                 if write_attempt < self.max_write_attempts - 1:
                     print("   🔄 Will retry with feedback...\n")
                 else:
+                    self._complete_stage("AUDITING_CV", success=False)
                     print("   ❌ Max attempts reached\n")
 
         # Print audit report regardless of pass/fail
@@ -372,6 +493,7 @@ Compare the two structured CVs carefully. Ensure that:
 
         # === REPORT PHASE — always runs ===
         final_report: FinalReport | None = None
+        self._set_stage("GENERATING_REPORT")
         try:
             print("\n🤖 Agent 5 (Report Writer): Generating self-review report...")
 
@@ -381,7 +503,9 @@ Compare the two structured CVs carefully. Ensure that:
             gap_analysis = compute_gap_analysis(
                 original_cv,
                 new_cv,
-                job_analysis_result.output if job_analysis_result and job_analysis_result.output else JobAnalysis(),
+                job_analysis_result.output
+                if job_analysis_result and job_analysis_result.output
+                else JobAnalysis(),
             )
 
             review_json = review.model_dump_json() if review is not None else "N/A"
@@ -411,10 +535,16 @@ Job Analysis: {job_data_json}
                 recommendation_rationale=narrative.recommendation_rationale,
                 passed=audit_passed,
             )
+            self._complete_stage("GENERATING_REPORT")
             print("   ✅ Report generated.\n")
 
         except Exception as e:
+            self._complete_stage("GENERATING_REPORT", success=False)
             print(f"   ⚠️ Report generation failed: {e}\n")
+
+        # Print final pipeline status
+        self._stage_status["GENERATING_REPORT"] = "done" if final_report else "failed"
+        self._print_pipeline_status()
 
         # Build audit_report dict for backward compatibility
         audit_report_dict: dict = {
@@ -438,6 +568,7 @@ Job Analysis: {job_data_json}
 
         return ResumeTailorResult(
             company_name=job_analysis.company_name,
+            job_title=job_analysis.job_title,
             tailored_resume=(
                 new_cv.model_dump_json()
                 if new_cv and hasattr(new_cv, "model_dump_json")
