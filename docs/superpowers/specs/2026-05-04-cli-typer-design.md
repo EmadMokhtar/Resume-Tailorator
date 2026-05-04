@@ -18,8 +18,8 @@ resume-tailor tailor <job-url> <resume-path> [options]
 **Arguments:**
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `JOB_URL` | Yes | - | URL of job posting to scrape |
-| `RESUME_PATH` | Yes | - | Path to resume (Markdown, DOCX, PDF) |
+| `--job-url` | Yes | - | URL of job posting to scrape |
+| `--resume-path` | Yes | - | Path to resume (Markdown, DOCX, PDF) |
 | `--output-dir` | No | `./output` | Directory for output files |
 | `--model` | No | None | AI model to use (e.g., `openai:gpt-4o-mini`) |
 
@@ -51,8 +51,8 @@ resume-tailor re-tailor <job-id> <recommendations> [options]
 **Arguments:**
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `JOB_ID` | Yes | - | UUID of prior job |
-| `RECOMMENDATIONS` | Yes | - | Comments/recommendations from prior audit |
+| `--job-id` | Yes | - | UUID of prior job |
+| `--recommendations` | Yes | - | Comments/recommendations from prior audit |
 | `--resume-path` | No | - | Path to resume (uses stored path if omitted) |
 | `--output-dir` | No | `./output` | Directory for output files |
 | `--model` | No | None | AI model to use |
@@ -96,7 +96,7 @@ Use existing SQLite database via memory service.
 
 | Scenario | Behavior |
 |----------|----------|
-| Missing required arg | Exit 1, Typer error with usage hint |
+| Missing required arg | Exit 1, print_typer error with usage hint |
 | Invalid URL format | Exit 1, clear error message |
 | Resume file not found | Exit 1, clear error message including the path |
 | Job ID not found | Exit 1, "Job not found: <id>" |
