@@ -566,6 +566,7 @@ Job Analysis: {job_data_json}
 
         return ResumeTailorResult(
             company_name=job_analysis.company_name,
+            job_title=job_analysis.job_title,
             tailored_resume=(
                 new_cv.model_dump_json()
                 if new_cv and hasattr(new_cv, "model_dump_json")
