@@ -6,17 +6,18 @@ from models.workflow import ResumeTailorResult
 from utils.pdf_converter import markdown_to_pdf
 
 
-def generate_resume(result: ResumeTailorResult) -> None:
+def generate_resume(result: ResumeTailorResult, output_dir: str = "./output") -> None:
     """
     Convert Markdown content to PDF with professional styling.
 
     Args:
         result: ResumeTailorResult object containing tailored resume and company name
+        output_dir: Directory to save output files.
     """
-    files_path = os.path.join(os.getcwd(), "files")
+    os.makedirs(output_dir, exist_ok=True)
     base_filename = f"tailored_resume_{result.company_name}"
-    md_output_path = os.path.join(files_path, f"{base_filename}.md")
-    pdf_output_path = os.path.join(files_path, f"{base_filename}.pdf")
+    md_output_path = os.path.join(output_dir, f"{base_filename}.md")
+    pdf_output_path = os.path.join(output_dir, f"{base_filename}.pdf")
 
     # Parse the CV JSON back to CV object
     cv_data = json.loads(result.tailored_resume)

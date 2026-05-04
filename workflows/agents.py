@@ -35,6 +35,21 @@ _auditor_qs = _QualityState()
 _cover_qs = _QualityState()
 
 MODEL_NAME = "openai:gpt-5-mini"
+_original_model = MODEL_NAME
+
+def get_model() -> str:
+    """Get the currently active model name."""
+    return MODEL_NAME
+
+def set_model(model: str) -> None:
+    """Override the model for all agents."""
+    global MODEL_NAME
+    MODEL_NAME = model
+
+def reset_model() -> None:
+    """Reset model to the original default."""
+    global MODEL_NAME
+    MODEL_NAME = _original_model
 
 # --- Quality Gate Agent ---
 # Universal reviewer: scores any pipeline agent's output 0-10 and requests improvements.
@@ -347,7 +362,7 @@ async def _validate_auditor(ctx: RunContext[None], output: AuditResult) -> Audit
 # --- Agent: JobScraperAgent ---
 # Responsibility: Scrape job postings from URLs and validate extracted content.
 job_scraper_agent = Agent(
-    "openai:gpt-4o-mini",
+    MODEL_NAME,
     output_type=ScrapedJobPosting,
     retries=3,
 )
