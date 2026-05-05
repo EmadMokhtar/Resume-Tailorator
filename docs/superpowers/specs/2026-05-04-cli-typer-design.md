@@ -12,14 +12,14 @@ Run the full resume tailoring workflow.
 
 **Usage:**
 ```
-resume-tailor tailor --job-url <url> --resume-path <path> [options]
+resume-tailor tailor <job-url> <resume-path> [options]
 ```
 
 **Arguments:**
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `--job-url` | Yes | - | URL of job posting to scrape |
-| `--resume-path` | Yes | - | Path to resume (Markdown, DOCX, PDF) |
+| `JOB_URL` | Yes | - | URL of job posting to scrape |
+| `RESUME_PATH` | Yes | - | Path to resume (Markdown, DOCX, PDF) |
 | `--output-dir` | No | `./output` | Directory for output files |
 | `--model` | No | None | AI model to use (e.g., `openai:gpt-4o-mini`) |
 
@@ -45,14 +45,14 @@ Re-run tailoring with recommendations from a prior audit.
 
 **Usage:**
 ```
-resume-tailor re-tailor --job-id <id> --recommendations <text> [options]
+resume-tailor re-tailor <job-id> <recommendations> [options]
 ```
 
 **Arguments:**
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `--job-id` | Yes | - | UUID of prior job |
-| `--recommendations` | Yes | - | Comments/recommendations from prior audit |
+| `JOB_ID` | Yes | - | UUID of prior job |
+| `RECOMMENDATIONS` | Yes | - | Comments/recommendations from prior audit |
 | `--resume-path` | No | - | Path to resume (uses stored path if omitted) |
 | `--output-dir` | No | `./output` | Directory for output files |
 | `--model` | No | None | AI model to use |
@@ -75,15 +75,20 @@ resume-tailor re-tailor --job-id <id> --recommendations <text> [options]
 
 Use existing SQLite database via memory service.
 
-**Table:** `jobs` (via memory service - verify existing schema)
+**Tables:**
+- `original_resume_sources` — stores the original resume file path and content
+- `parsed_original_resumes` — stores the structured parsed resume linked to a source
+- `tailored_resumes` — stores each tailoring run with job posting, tailored CV, audit result, and link to the original source
 
-**Fields stored per job:**
+**Fields stored per tailoring run (`tailored_resumes`):**
 - `id` (UUID, primary key)
+- `source_id` (FK to `original_resume_sources`)
 - `company_name`
 - `job_title`
-- `resume_path`
-- `resume_content` (for re-tailor)
 - `job_posting_markdown`
+- `tailored_resume`
+- `audit_result`
+- `report`
 - `created_at`
 - `updated_at`
 
@@ -91,7 +96,7 @@ Use existing SQLite database via memory service.
 
 | Scenario | Behavior |
 |----------|----------|
-| Missing required arg | Exit 1, print_typer error with usage hint |
+| Missing required arg | Exit 1, Typer error with usage hint |
 | Invalid URL format | Exit 1, clear error message |
 | Resume file not found | Exit 1, print error with path |
 | Job ID not found | Exit 1, "Job not found: <id>" |

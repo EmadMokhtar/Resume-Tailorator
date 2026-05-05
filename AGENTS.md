@@ -6,7 +6,7 @@
 uv sync                        # install dev deps
 export OPENAI_API_KEY=sk-…
 uv run resume-tailor tailor <JOB_URL> <RESUME_PATH>          # scrape + tailor
-uv run resume-tailor re_tailor <JOB_ID> <RECOMMENDATIONS>    # re-run with feedback
+uv run resume-tailor re-tailor <JOB_ID> <RECOMMENDATIONS>    # re-run with feedback
 ```
 
 ## CLI Commands
@@ -16,7 +16,7 @@ Two Typer subcommands in `resume_tailorator/main.py`:
 | Command | Signature | Description |
 |---------|-----------|-------------|
 | `tailor` | `tailor JOB_URL RESUME_PATH [--output-dir] [--model]` | Scrape job posting, run full pipeline |
-| `re_tailor` | `re_tailor JOB_ID RECOMMENDATIONS [--resume-path] [--output-dir] [--model]` | Re-run with prior audit feedback |
+| `re-tailor` | `re-tailor JOB_ID RECOMMENDATIONS [--resume-path] [--output-dir] [--model]` | Re-run with prior audit feedback |
 
 A console script is registered: `resume-tailor` → `resume_tailorator.main:run` (see `pyproject.toml`).
 
@@ -25,7 +25,7 @@ A console script is registered: `resume-tailor` → `resume_tailorator.main:run`
 | Command | How to run | Description |
 |---------|------------|-------------|
 | `tailor` | `uv run resume-tailor tailor <URL> <PATH>` | Scrape job posting and run the agentic workflow. |
-| `re_tailor` | `uv run resume-tailor re_tailor <ID> <RECS>` | Re-run tailoring with prior audit recommendations. |
+| `re-tailor` | `uv run resume-tailor re-tailor <ID> <RECS>` | Re-run tailoring with prior audit recommendations. |
 | `test` | `make test` or `uv run pytest -v` | Run the full test suite. |
 | `install/dev` | `make install/dev` or `uv sync` | Install development dependencies (incl. `pytest`, `ruff`). |
 | `help` | `make help` | Show Makefile targets. |
@@ -41,7 +41,7 @@ A console script is registered: `resume-tailor` → `resume_tailorator.main:run`
 
 - Both CLI commands use **positional arguments** (not interactive prompts).
 - `tailor` requires a job URL (scraped via Playwright) and a resume path (`.md`, `.docx`, or `.pdf`).
-- `re_tailor` requires a job ID (UUID from a prior `tailor` run) and recommendations text. It uses the stored job posting and resolved resume.
+- `re-tailor` requires a job ID (UUID from a prior `tailor` run) and recommendations text. It uses the stored job posting and resolved resume.
 - `resume_tailorator/utils/` contains:
   - `validate_inputs.py` — Standalone input validation script (not used by the Typer CLI).
   - `resume_converter.py` — Converts DOCX/PDF to Markdown via `markitdown`.
@@ -93,7 +93,7 @@ The **Write → Review → Audit** inner loop: after the initial write, the revi
 - **Framework**: `pydantic-ai` (agent orchestration)
 - **LLM**: OpenAI GPT (configurable; default `openai:gpt-5-mini`)
 - **Models**: Pydantic v2 for structured outputs
-- **CLI**: Typer with two subcommands (`tailor`, `re_tailor`)
+- **CLI**: Typer with two subcommands (`tailor`, `re-tailor`)
 - **Web Scraping**: Playwright (headless Chromium)
 - **HTML→Markdown**: `html2text` and `markitdown` (multi-strategy fallback)
 - **Resume Conversion**: `markitdown` (DOCX/PDF → Markdown)
@@ -121,7 +121,7 @@ uv run pytest -v
 - **Anti-cliché**: Avoid terms like "spearheaded", "synergy", "leveraged", "game-changer".
 - **Quality Gates**: Each agent output is scored 0–10 by a quality gate validator; score < 9 triggers retry.
 - **Resume formats**: Accepts `.md`, `.docx`, `.pdf`; DOCX/PDF are converted to Markdown before processing.
-- **Memory**: Each `tailor` run stores the original resume, tailored CV, audit result, and job posting in SQLite. `re_tailor` reuses the stored job posting.
+- **Memory**: Each `tailor` run stores the original resume, tailored CV, audit result, and job posting in SQLite. `re-tailor` reuses the stored job posting.
 - **Output**: Tailored resumes and reports are saved to `output/` (overridable via `--output-dir`).
 
 ## Other Instruction Files

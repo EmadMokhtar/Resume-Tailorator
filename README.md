@@ -11,10 +11,10 @@ Resume Tailorator is a multi-agent AI system that analyzes job postings and tail
 - **Resume Memory**: Stores your original resume plus job-specific tailored outputs in SQLite.
 - **Authentic Tailoring**: Rephrases your experience to match the job without inventing skills.
 - **Hallucination & Cliché Detection**: Built-in auditor to ensure quality and "human" tone.
-- **Quality Gate Validators**: Each agent's output is scored 0–10 by a quality gate before the pipeline proceeds.
+- **Quality Gate Validators**: Core pipeline agents' output is scored 0–10 by a quality gate before the pipeline proceeds.
 - **Comprehensive Reporting**: Generates self-review reports with gaps analysis, suggestions, and recommendations.
 - **Self-Correcting Workflow**: Write → Review → Audit loop with retries and quality feedback (up to 3 write attempts).
-- **Re-Tailoring**: Re-run tailoring on a saved job with recommendations from a prior audit (`re_tailor` command).
+- **Re-Tailoring**: Re-run tailoring on a saved job with recommendations from a prior audit (`re-tailor` command).
 
 ## 🛠️ Architecture
 
@@ -27,7 +27,7 @@ The system runs a sequential pipeline of 6 stages:
 5.  **Auditor**: Validates for hallucinations and AI clichés → Quality gate validates audit quality
 6.  **Report Generator**: Compiles a self-review report with CVDiff, gap analysis, and recommendations
 
-**Quality Gate System**: Each agent has a built-in validator that checks output quality (scored 0–10). If quality is insufficient (score < 9), the agent retries with corrective feedback. On quality gate exhaustion, the system falls back to the last available output.
+**Quality Gate System**: Core pipeline agents have built-in validators that check output quality (scored 0–10). If quality is insufficient (score < 9), the agent retries with corrective feedback. On quality gate exhaustion, the system falls back to the last available output.
 
 **Write → Review → Audit Loop**: After the initial write, the reviewer scores the draft and suggests refinements. Once review iterations are exhausted, the auditor checks for hallucinations. If the audit fails, the entire write → review → audit loop retries (up to 3 write attempts).
 
@@ -84,10 +84,10 @@ uv run resume-tailor tailor \
   --model openai:gpt-4o-mini
 ```
 
-### `re_tailor` — Re-run with feedback from a prior audit
+### `re-tailor` — Re-run with feedback from a prior audit
 
 ```bash
-uv run resume-tailor re_tailor <JOB_ID> <RECOMMENDATIONS> [OPTIONS]
+uv run resume-tailor re-tailor <JOB_ID> <RECOMMENDATIONS> [OPTIONS]
 ```
 
 **Arguments:**
@@ -102,7 +102,7 @@ uv run resume-tailor re_tailor <JOB_ID> <RECOMMENDATIONS> [OPTIONS]
 ### Example
 
 ```bash
-uv run resume-tailor re_tailor \
+uv run resume-tailor re-tailor \
   a1b2c3d4-... \
   "Add more emphasis on cloud infrastructure experience" \
   --model openai:gpt-4o-mini
@@ -121,6 +121,8 @@ uv run python resume_tailorator/main.py tailor <JOB_URL> <RESUME_PATH>
 Upon successful completion, output files are saved in the `output/` directory (or the path specified via `--output-dir`):
 
 *   `tailored_resume_<Company_Name>.md` — Tailored resume in Markdown format
+*   `tailored_resume_<company_name>.pdf` — Tailored resume in PDF format
+*   `tailored_resume_<company_name>.docx` — Tailored resume in DOCX format
 *   `report_<company_name>.md` — Comprehensive self-review report
 
 ## 🧠 Resume Memory Behavior
@@ -147,8 +149,8 @@ Each workflow run generates a **self-review report** that includes:
 
 The system includes built-in quality validation for every agent:
 
-- **Validation Threshold**: Each agent's output must score 9/10 or higher to proceed
-- **Automatic Retry**: If validation fails, the agent receives corrective feedback and retries (up to 2 retries)
+- **Validation Threshold**: Core pipeline agents' output must score 9/10 or higher to proceed
+- **Automatic Retry**: If validation fails, the agent receives corrective feedback and retries (up to 5 retries)
 - **Graceful Fallback**: On quality gate exhaustion, the system uses the last available output instead of failing fatally
 - **Token Usage Tracking**: All validation runs are included in usage metrics for accurate cost tracking
 
@@ -169,7 +171,7 @@ The system includes built-in quality validation for every agent:
 ```
 resume_tailorator/
 ├── resume_tailorator/       # Main Python package
-│   ├── main.py              # CLI entry point (Typer: tailor + re_tailor)
+│   ├── main.py              # CLI entry point (Typer: tailor + re-tailor)
 │   ├── workflows/           # Workflow orchestration and agent definitions
 │   ├── models/              # Pydantic data models (agents, workflow)
 │   ├── memory/              # SQLite-backed memory (parser, repository, service)
@@ -186,7 +188,7 @@ resume_tailorator/
 
 - **Anti-Hallucination**: The system is strictly instructed never to invent skills or experiences.
 - **Cliché Filter**: Avoids terms like "spearheaded", "synergy", "leveraged", and "game-changer".
-- **Multi-Layer Validation**: Quality gates score every agent output; auditor cross-checks final CV against the original.
+- **Multi-Layer Validation**: Quality gates score core pipeline agent output; auditor cross-checks final CV against the original.
 
 ## 🤝 Contributing
 
