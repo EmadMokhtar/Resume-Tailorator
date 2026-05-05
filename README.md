@@ -2,35 +2,34 @@
 
 ![cover](./cover.png)
 
-Resume Tailorator is a sophisticated multi-agent AI system designed to analyze job postings and tailor your resume to match specific job requirements. It ensures authenticity, avoids AI clichés, and optimizes for Applicant Tracking Systems (ATS).
+Resume Tailorator is a multi-agent AI system that analyzes job postings and tailors your resume to match specific job requirements. It ensures authenticity, avoids AI clichés, and optimizes for Applicant Tracking Systems (ATS).
 
 ## 🚀 Features
 
-- **Multi-Agent Architecture**: Uses 7 specialized agents for comprehensive analysis, writing, and quality assurance.
-- **Automated Job Analysis**: Extracts key requirements and skills from job postings.
+- **Multi-Agent Architecture**: 6 pipeline stages with dedicated agents for analysis, writing, and quality assurance.
+- **Automated Job Scraping**: Fetches job posting content from any public URL using Playwright.
 - **Resume Memory**: Stores your original resume plus job-specific tailored outputs in SQLite.
 - **Authentic Tailoring**: Rephrases your experience to match the job without inventing skills.
 - **Hallucination & Cliché Detection**: Built-in auditor to ensure quality and "human" tone.
-- **Quality Gate Validators**: Self-review mechanism that validates each agent's output (95%+ quality threshold) before proceeding.
-- **Comprehensive Reporting**: Generates detailed self-review reports including gaps analysis, suggestions, and recommendations.
-- **Cover Letter Generation**: Automatically generates tailored cover letters alongside resumes.
-- **Dual Output**: Generates both Markdown (`.md`) and PDF (`.pdf`) versions of the tailored resume and reports.
-- **Input Validation**: Ensures your input files are correctly formatted before processing.
-- **Self-Correcting Workflow**: Agents validate output and iterate based on quality feedback with retry logic.
+- **Quality Gate Validators**: Each agent's output is scored 0–10 by a quality gate before the pipeline proceeds.
+- **Comprehensive Reporting**: Generates self-review reports with gaps analysis, suggestions, and recommendations.
+- **Self-Correcting Workflow**: Write → Review → Audit loop with retries and quality feedback (up to 3 write attempts).
+- **Re-Tailoring**: Re-run tailoring on a saved job with recommendations from a prior audit (`re_tailor` command).
 
 ## 🛠️ Architecture
 
-The system employs a sequential pipeline of 7 AI agents with integrated quality gates:
+The system runs a sequential pipeline of 6 stages:
 
-1.  **Analyst Agent**: Extracts structured job requirements → Quality gate validates extraction (95%+)
-2.  **Resume Parser Agent**: Parses your Markdown resume into structured data → Quality gate validates parsing
-3.  **Writer Agent**: Tailors the CV to match job requirements → Quality gate validates tailoring
-4.  **Auditor Agent**: Validates for hallucinations and AI clichés → Quality gate validates audit quality
-5.  **Reviewer Agent**: Provides quality feedback and recommendations
-6.  **Cover Letter Writer Agent**: Generates tailored cover letter → Quality gate validates letter quality
-7.  **Report Agent**: Compiles comprehensive self-review report with gaps analysis and suggestions
+1.  **Resume Parser**: Parses your resume (Markdown, DOCX, or PDF) into structured data → Quality gate validates parsing
+2.  **Job Analyst**: Extracts structured job requirements (title, company, skills, keywords) → Quality gate validates extraction
+3.  **CV Writer**: Tailors the CV to match job requirements → Quality gate validates tailoring
+4.  **Reviewer**: Scores CV quality and suggests improvements; triggers refinement loop
+5.  **Auditor**: Validates for hallucinations and AI clichés → Quality gate validates audit quality
+6.  **Report Generator**: Compiles a self-review report with CVDiff, gap analysis, and recommendations
 
-**Quality Gate System**: Each agent has a built-in validator that checks output quality (score ≥95/100). If quality is insufficient, the agent retries with corrective feedback (up to 5 attempts). If all retries are exhausted, the system uses fallback recovery from the last successful output.
+**Quality Gate System**: Each agent has a built-in validator that checks output quality (scored 0–10). If quality is insufficient (score < 9), the agent retries with corrective feedback. On quality gate exhaustion, the system falls back to the last available output.
+
+**Write → Review → Audit Loop**: After the initial write, the reviewer scores the draft and suggests refinements. Once review iterations are exhausted, the auditor checks for hallucinations. If the audit fails, the entire write → review → audit loop retries (up to 3 write attempts).
 
 ## 📋 Prerequisites
 
@@ -53,177 +52,141 @@ The system employs a sequential pipeline of 7 AI agents with integrated quality 
     ```
 
 3.  **Set up Environment Variables**:
-    Export your OpenAI API key (or other provider keys):
+    Export your OpenAI API key:
     ```bash
     export OPENAI_API_KEY=your_api_key_here
-    ```
-    
-    *Optional: For automatic job scraping, you can also set:*
-    ```bash
-    export JOB_URL="https://example.com/job-posting"
     ```
 
 ## 🏃 Usage
 
-### Option A: Manual Job Posting (Traditional)
+The CLI uses **positional arguments** (not interactive prompts). Two commands are available:
 
-1.  **Prepare Input Files**:
-    Navigate to the `files/` directory and update:
-    *   `job_posting.md`: Paste the job description you want to apply for.
-
-    *Note: Do not leave the default placeholder text in the file.*
-
-2.  **Import your original resume on the first run**:
-    Provide the path to your Markdown resume:
-    ```bash
-    make run RESUME_PATH=/absolute/path/to/resume.md
-    ```
-
-3.  **Run later submissions**:
-    Reuse the latest stored original resume:
-    ```bash
-    make run
-    ```
-
-    Switch to a different original resume whenever needed:
-    ```bash
-    make run RESUME_PATH=/absolute/path/to/updated_resume.md
-    ```
-
-### Option B: Automatic Job Posting Scraping (New Feature)
-
-Resume Tailorator can automatically fetch and convert job postings from URLs, eliminating the need to manually copy-paste job descriptions.
-
-#### Using the `--job-url` CLI Argument
+### `tailor` — Run the full workflow
 
 ```bash
-# Provide a job URL and resume path
-make run RESUME_PATH=/path/to/resume.md JOB_URL="https://example.com/job-posting"
-
-# Or just the job URL (reuses latest stored resume)
-make run JOB_URL="https://example.com/job-posting"
+uv run resume-tailor tailor <JOB_URL> <RESUME_PATH> [OPTIONS]
 ```
 
-#### Using the `JOB_URL` Environment Variable
+**Arguments:**
+- `JOB_URL` — URL of the job posting (must start with `http://` or `https://`)
+- `RESUME_PATH` — Path to your resume (`.md`, `.docx`, or `.pdf`)
+
+**Options:**
+- `--output-dir PATH` — Output directory (default: `./output`)
+- `--model MODEL` — AI model override (default: `openai:gpt-5-mini`)
+
+### Example
 
 ```bash
-# Set environment variable and run
-export JOB_URL="https://example.com/job-posting"
-make run RESUME_PATH=/path/to/resume.md
-
-# Or reuse latest resume
-make run
+uv run resume-tailor tailor \
+  https://www.linkedin.com/jobs/view/12345678 \
+  /Users/me/resume.md \
+  --model openai:gpt-4o-mini
 ```
 
-#### How It Works
-
-1. **URL Provided**: System automatically scrapes and converts the job posting to Markdown
-2. **Intelligent Extraction**: Uses an LLM agent with multi-strategy fallback (Playwright → markitdown → html2text)
-3. **No Manual Copy-Paste**: Job content extracted from the live URL automatically
-4. **Retry Logic**: Handles JavaScript-heavy sites and common scraping obstacles
-5. **Priority**: `--job-url` argument > `JOB_URL` env var > `files/job_posting.md` (manual file)
-
-#### Supported Job Board Formats
-
-The scraper works with most job boards including:
-- LinkedIn
-- Indeed
-- GitHub Jobs
-- Company career pages
-- Custom job posting platforms
-
-#### Example: Fetch and Tailor in One Command
+### `re_tailor` — Re-run with feedback from a prior audit
 
 ```bash
-make run \
-  RESUME_PATH=$HOME/my-resume.md \
-  JOB_URL="https://www.linkedin.com/jobs/view/12345678"
+uv run resume-tailor re_tailor <JOB_ID> <RECOMMENDATIONS> [OPTIONS]
+```
+
+**Arguments:**
+- `JOB_ID` — UUID of the prior job (shown in output after a `tailor` run)
+- `RECOMMENDATIONS` — Comments or recommendations from the prior audit report
+
+**Options:**
+- `--resume-path PATH` — Resume path (uses the stored path from the prior job if omitted)
+- `--output-dir PATH` — Output directory (default: `./output`)
+- `--model MODEL` — AI model override
+
+### Example
+
+```bash
+uv run resume-tailor re_tailor \
+  a1b2c3d4-... \
+  "Add more emphasis on cloud infrastructure experience" \
+  --model openai:gpt-4o-mini
+```
+
+### Alternative entry point
+
+You can also invoke the CLI directly:
+
+```bash
+uv run python resume_tailorator/main.py tailor <JOB_URL> <RESUME_PATH>
 ```
 
 ### View Results
 
-Upon successful completion, the tailored resume and self-review report will be saved in the `files/` directory:
-*   `tailored_resume_<Company_Name>.md` - Tailored resume in Markdown format
-*   `tailored_resume_<Company_Name>.pdf` - Tailored resume in PDF format
-*   `self_review_report_<Company_Name>.md` - Comprehensive self-review report (human-readable)
-*   `cover_letter_<Company_Name>.md` - Generated cover letter in Markdown format
+Upon successful completion, output files are saved in the `output/` directory (or the path specified via `--output-dir`):
+
+*   `tailored_resume_<Company_Name>.md` — Tailored resume in Markdown format
+*   `report_<company_name>.md` — Comprehensive self-review report
 
 ## 🧠 Resume Memory Behavior
 
-- The first run requires `RESUME_PATH` so the CLI can store your original resume.
-- If you omit `RESUME_PATH` later, the CLI reuses the latest stored original resume.
-- The system reparses the original resume only when its content changes or the parser version changes.
+- The first run requires providing a resume path so the CLI can store your original resume.
+- Subsequent runs reuse the latest stored original resume from the SQLite database.
 - Every job submission starts from the original resume, never from a previous tailored resume.
 - Each successful tailoring run stores the tailored resume and audit result linked back to the original source resume.
 - The local memory database lives at `files/resume_memory.sqlite3`.
 
 ## 📊 Self-Review Report
 
-Each workflow run generates a comprehensive **self-review report** that includes:
+Each workflow run generates a **self-review report** that includes:
 
-- **What Changed**: Line-by-line diff between original and tailored resume
-- **Quality Metrics**: Hallucination score (0-10) and AI cliché score (0-10)
-- **Gap Analysis**: Missing skills/requirements from your resume vs. the job posting
+- **What Changed**: Summary changes, reordered/deprioritized skills, and per-experience bullet rewrites
+- **Quality Metrics**: Hallucination score (0–10) and AI cliché score (0–10)
+- **Gap Analysis**: Keyword coverage, missing hard/soft skills vs. the job posting
 - **Suggestions to Strengthen**: Recommended improvements to better match the job
 - **Audit Summary**: Feedback from the auditor on tone, authenticity, and compliance
-- **Overall Recommendation**: Go/No-Go assessment for submitting the tailored resume
-- **Match Score**: Calculated score of how well your resume aligns with job requirements
-
-The report is saved as both:
-- `self_review_report_<Company_Name>.md` - Human-readable Markdown format
-- `self_review_report_<Company_Name>.json` - Structured JSON for programmatic access
+- **Overall Recommendation**: "Strong Match", "Partial Match", or "Weak Match"
+- **Match Score**: 0–100 score based on keyword coverage and gap severity
 
 ## ✅ Quality Gate System
 
 The system includes built-in quality validation for every agent:
 
-- **Validation Threshold**: Each agent's output must score ≥95/100 to proceed
-- **Automatic Retry**: If validation fails, the agent receives corrective feedback and retries (up to 5 attempts)
-- **Graceful Fallback**: If all retries are exhausted, the system uses the last successful output instead of failing
-- **Transparent Scoring**: Quality checks evaluate hallucination risk, authenticity, and task completion
+- **Validation Threshold**: Each agent's output must score 9/10 or higher to proceed
+- **Automatic Retry**: If validation fails, the agent receives corrective feedback and retries (up to 2 retries)
+- **Graceful Fallback**: On quality gate exhaustion, the system uses the last available output instead of failing fatally
 - **Token Usage Tracking**: All validation runs are included in usage metrics for accurate cost tracking
 
 ## 🛠️ Make Commands
 
-This project uses a `Makefile` to simplify common tasks. Here are the available commands:
+| Command            | Description                                          |
+|--------------------|------------------------------------------------------|
+| `make help`        | Show available commands and descriptions.            |
+| `make install`     | Install production dependencies using `uv`.           |
+| `make install/dev` | Install development dependencies using `uv`.          |
+| `make test`        | Run the full test suite using `pytest`.               |
+| `make install/uv`  | Ensure `uv` is installed (auto-run by other targets). |
 
-| Command            | Description                                                     |
-|--------------------|---------|
-| `make help`        | Show available commands and descriptions.                       |
-| `make install`     | Install production dependencies using `uv`.                     |
-| `make install/dev` | Install development dependencies using `uv`.                    |
-| `make run`         | Validate inputs and run the workflow using the latest original resume. |
-| `make run RESUME_PATH=/path/to/resume.md` | Import or switch the original resume for the run. |
-| `make run JOB_URL="https://..."` | Provide a job posting URL for automatic scraping. |
-| `make run RESUME_PATH=/path/to/resume.md JOB_URL="https://..."` | Both resume and job URL together. |
-| `make install/uv`  | Ensure `uv` is installed (automatically run by other commands). |
-
-**Parameter Priority:**
-- CLI `--job-url` / `JOB_URL` environment variable → Automatic scraping
-- Falls back to `files/job_posting.md` if no URL provided
+> **Note:** The `make run` target is deprecated and uses outdated paths. Use `uv run resume-tailor tailor <JOB_URL> <RESUME_PATH>` instead.
 
 ## 📂 Project Structure
 
 ```
 resume_tailorator/
-├── files/                  # Input and output files
-│   ├── job_posting.md      # Target job description
-│   └── resume_memory.sqlite3  # Local original/tailored resume memory
-├── models/                 # Pydantic data models
-├── memory/                 # Resume memory models, service, and repositories
-├── tools/                  # Helper tools (Playwright, etc.)
-├── utils/                  # Utilities (PDF generation, validation)
-├── workflows/              # Agent definitions and workflow logic
-├── main.py                 # Entry point
-├── Makefile                # Command shortcuts
-└── pyproject.toml          # Project configuration
+├── resume_tailorator/       # Main Python package
+│   ├── main.py              # CLI entry point (Typer: tailor + re_tailor)
+│   ├── workflows/           # Workflow orchestration and agent definitions
+│   ├── models/              # Pydantic data models (agents, workflow)
+│   ├── memory/              # SQLite-backed memory (parser, repository, service)
+│   ├── tools/               # Playwright scraping, HTML parsing helpers
+│   └── utils/               # Markdown writer, resume conversion, CV diff
+├── tests/                   # Test suite
+├── output/                  # Default output directory for generated files
+├── Makefile                 # Command shortcuts
+├── pyproject.toml           # Project configuration and dependencies
+└── README.md                # This file
 ```
 
 ## 🛡️ Safety & Quality
 
 - **Anti-Hallucination**: The system is strictly instructed never to invent skills or experiences.
-- **Cliché Filter**: Avoids terms like "spearheaded", "synergy", and "game-changer".
-- **Validation**: The `make run` command checks the job posting and, when provided, the resume path before starting the expensive AI process.
+- **Cliché Filter**: Avoids terms like "spearheaded", "synergy", "leveraged", and "game-changer".
+- **Multi-Layer Validation**: Quality gates score every agent output; auditor cross-checks final CV against the original.
 
 ## 🤝 Contributing
 
