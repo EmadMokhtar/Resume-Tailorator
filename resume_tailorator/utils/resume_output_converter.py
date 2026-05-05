@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Protocol
 
-from models.workflow import ResumeTailorResult
-from utils.resume_converter import (
+from resume_tailorator.models.workflow import ResumeTailorResult
+from resume_tailorator.utils.resume_converter import (
     OutputConversionFailedError,
     UnsupportedOutputFormatError,
 )

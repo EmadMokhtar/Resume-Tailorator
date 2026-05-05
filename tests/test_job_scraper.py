@@ -14,8 +14,8 @@ import pytest
 from pydantic_ai import models
 from pydantic_ai.models.test import TestModel
 
-from models.agents.output import ScrapedJobPosting
-from tools.job_scraper_helpers import (
+from resume_tailorator.models.agents.output import ScrapedJobPosting
+from resume_tailorator.tools.job_scraper_helpers import (
     detect_placeholder_content,
     clean_job_posting_markdown,
     parse_html_with_markitdown,
@@ -34,7 +34,7 @@ models.ALLOW_MODEL_REQUESTS = False
 
 # Import agent and tools only if playwright is available
 if HAS_PLAYWRIGHT:
-    from workflows.agents import job_scraper_agent, validate_extraction
+    from resume_tailorator.workflows.agents import job_scraper_agent, validate_extraction
 else:
     # Define dummy validate_extraction for non-agent tests
     def validate_extraction(raw_html: str, extracted_markdown: str) -> dict:

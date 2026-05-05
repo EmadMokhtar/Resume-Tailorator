@@ -71,7 +71,23 @@ def sample_pdf(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def sample_markdown_path(tmp_path: Path) -> Path:
+def sample_cv():
+    from resume_tailorator.models.agents.output import CV, WorkExperience
+    return CV(
+        full_name="Jane Smith",
+        contact_info="jane@example.com",
+        summary="Experienced Python engineer.",
+        skills=["Python", "Django"],
+        experience=[
+            WorkExperience(
+                company="Acme Corp",
+                role="Senior Engineer",
+                dates="2020-2024",
+                highlights=["Built microservices"],
+            )
+        ],
+        education=["BSc CS, State University, 2018"],
+    )
     path = tmp_path / "resume.md"
     path.write_text(SAMPLE_MARKDOWN, encoding="utf-8")
     return path

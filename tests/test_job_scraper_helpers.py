@@ -4,7 +4,7 @@ Tests for placeholder detection, HTML parsing, and content cleaning utilities.
 """
 
 import pytest
-from tools.job_scraper_helpers import (
+from resume_tailorator.tools.job_scraper_helpers import (
     detect_placeholder_content,
     clean_job_posting_markdown,
 )

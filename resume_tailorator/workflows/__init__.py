@@ -5,10 +5,10 @@ from pydantic_ai import AgentRunResult
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.usage import RunUsage
 
-from models.agents.output import CV, CVDiff, FinalReport, JobAnalysis
-from models.workflow import ResumeTailorResult
-from utils.cv_diff import compute_cv_diff, compute_gap_analysis
-from workflows.agents import (
+from resume_tailorator.models.agents.output import CV, CVDiff, FinalReport, JobAnalysis
+from resume_tailorator.models.workflow import ResumeTailorResult
+from resume_tailorator.utils.cv_diff import compute_cv_diff, compute_gap_analysis
+from resume_tailorator.workflows.agents import (
     _analyst_qs,
     _auditor_qs,
     _parser_qs,

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     ParsedOriginalResumeRecord,
     ResumeSourceRecord,
     TailoredResumeRecord,
@@ -53,6 +53,10 @@ class ResumeMemoryRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_source_by_id(self, source_id: str) -> ResumeSourceRecord | None:
+        raise NotImplementedError
+
+    @abstractmethod
     def save_tailored_resume(
         self,
         source_id: str,
@@ -66,4 +70,8 @@ class ResumeMemoryRepository(ABC):
 
     @abstractmethod
     def get_tailored_resume(self, job_fingerprint: str) -> TailoredResumeRecord | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_tailored_resume_by_id(self, record_id: str) -> TailoredResumeRecord | None:
         raise NotImplementedError

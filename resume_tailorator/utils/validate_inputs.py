@@ -70,7 +70,6 @@ def main():
         metavar="URL",
         help=(
             "URL of the job posting to scrape. "
-            "Priority: CLI > JOB_URL env var > markdown file. "
             "Must start with http:// or https://."
         ),
     )
@@ -98,8 +97,8 @@ def main():
 
     valid_job = validate_file(job_posting_path, "Job posting file", job_defaults)
 
-    # Handle job URL (CLI > env var > None)
-    job_url = args.job_url or os.getenv("JOB_URL")
+    # Handle job URL from CLI only (no env var fallback)
+    job_url = args.job_url
 
     if job_url:
         try:

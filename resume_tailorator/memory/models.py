@@ -4,7 +4,7 @@ import json
 
 from pydantic import AwareDatetime, BaseModel, field_validator
 
-from models.agents.output import CV
+from resume_tailorator.models.agents.output import CV
 
 
 class ResumeMemoryError(Exception):
@@ -57,6 +57,7 @@ class TailoredResumeRecord(BaseModel):
     job_title: str
     tailored_cv_json: str
     audit_report_json: str
+    job_posting_markdown: str = ""
     created_at: AwareDatetime
     updated_at: AwareDatetime
 

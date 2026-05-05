@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from models.agents.output import FinalReport
+from resume_tailorator.models.agents.output import FinalReport
 
 
 class ResumeTailorResult(BaseModel):

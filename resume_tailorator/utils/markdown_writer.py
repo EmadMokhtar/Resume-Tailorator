@@ -1,21 +1,26 @@
 import os
 import json
 
-from models.agents.output import FinalReport
-from models.workflow import ResumeTailorResult
-from utils.pdf_converter import markdown_to_pdf
+from resume_tailorator.models.agents.output import FinalReport
+from resume_tailorator.models.workflow import ResumeTailorResult
+from resume_tailorator.utils.pdf_converter import markdown_to_pdf
 
 
-def generate_resume(result: ResumeTailorResult, output_dir: str = "./output") -> None:
+def generate_resume(result: ResumeTailorResult, output_dir: str = "./output") -> str:
     """
     Convert tailored CV to Markdown, PDF, and DOCX formats.
 
     Args:
         result: ResumeTailorResult object containing tailored resume and company name
         output_dir: Directory to save output files.
+
+    Returns:
+        The path to the generated Markdown file.
     """
     os.makedirs(output_dir, exist_ok=True)
-    base_filename = f"tailored_resume_{result.company_name}"
+    # Use slugified filename to match CLI path expectations.
+    company_slug = result.company_name.replace(" ", "_").lower()
+    base_filename = f"tailored_resume_{company_slug}"
     md_output_path = os.path.join(output_dir, f"{base_filename}.md")
     pdf_output_path = os.path.join(output_dir, f"{base_filename}.pdf")
     docx_output_path = os.path.join(output_dir, f"{base_filename}.docx")
@@ -96,6 +101,8 @@ def generate_resume(result: ResumeTailorResult, output_dir: str = "./output") ->
     print(
         f"✅ Tailored CV saved to:\n   - Markdown: {md_output_path}\n   - PDF: {pdf_output_path}\n   - DOCX: {docx_output_path}"
     )
+
+    return md_output_path
 
 
 def generate_report_markdown(report: FinalReport) -> str:

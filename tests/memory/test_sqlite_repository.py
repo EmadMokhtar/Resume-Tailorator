@@ -15,8 +15,8 @@ import json
 
 import pytest
 
-from memory.models import ResumeMemoryError
-from memory.sqlite_repository import SQLiteResumeMemoryRepository
+from resume_tailorator.memory.models import ResumeMemoryError
+from resume_tailorator.memory.sqlite_repository import SQLiteResumeMemoryRepository
 
 
 # ---------------------------------------------------------------------------

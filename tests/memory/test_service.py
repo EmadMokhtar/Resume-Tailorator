@@ -26,17 +26,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     MissingOriginalResumeError,
     ParsedOriginalResumeRecord,
     ResumeMemoryError,
     ResumeSourceRecord,
     TailoredResumeRecord,
 )
-from memory.parser import PydanticAIResumeParser, ResumeParserAdapter
-from memory.repository import ResumeMemoryRepository
-from memory.service import ResumeMemoryService
-from models.agents.output import AuditResult, CV, WorkExperience
+from resume_tailorator.memory.parser import PydanticAIResumeParser, ResumeParserAdapter
+from resume_tailorator.memory.repository import ResumeMemoryRepository
+from resume_tailorator.memory.service import ResumeMemoryService
+from resume_tailorator.models.agents.output import AuditResult, CV, WorkExperience
 
 
 def _make_cv(full_name: str = "Jane Doe") -> CV:
@@ -98,6 +98,9 @@ class FakeRepository(ResumeMemoryRepository):
             if s.path == path:
                 return s
         return None
+
+    def get_source_by_id(self, source_id: str) -> ResumeSourceRecord | None:
+        return self._sources.get(source_id)
 
     def upsert_original_source(
         self,
@@ -179,6 +182,7 @@ class FakeRepository(ResumeMemoryRepository):
         job_title: str,
         tailored_cv_json: str,
         audit_report_json: str,
+        job_posting_markdown: str = "",
     ) -> TailoredResumeRecord:
         now = datetime.now(timezone.utc)
         existing = self._tailored.get(job_fingerprint)
@@ -190,6 +194,7 @@ class FakeRepository(ResumeMemoryRepository):
             job_title=job_title,
             tailored_cv_json=tailored_cv_json,
             audit_report_json=audit_report_json,
+            job_posting_markdown=job_posting_markdown,
             created_at=existing.created_at if existing else now,
             updated_at=now,
         )
@@ -198,6 +203,12 @@ class FakeRepository(ResumeMemoryRepository):
 
     def get_tailored_resume(self, job_fingerprint: str) -> TailoredResumeRecord | None:
         return self._tailored.get(job_fingerprint)
+
+    def get_tailored_resume_by_id(self, record_id: str) -> TailoredResumeRecord | None:
+        for record in self._tailored.values():
+            if record.id == record_id:
+                return record
+        return None
 
 
 # ---------------------------------------------------------------------------

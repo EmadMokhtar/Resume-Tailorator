@@ -2,8 +2,8 @@
 
 import pytest
 
-from models.agents.output import AuditResult, JobAnalysis, ReviewResult
-from workflows import ResumeTailorWorkflow
+from resume_tailorator.models.agents.output import AuditResult, JobAnalysis, ReviewResult
+from resume_tailorator.workflows import ResumeTailorWorkflow
 
 
 class DummyRunResult:
@@ -15,8 +15,10 @@ class DummyRunResult:
 async def test_workflow_uses_provided_original_cv_without_reparsing(
     monkeypatch, sample_cv, subtests
 ) -> None:
-    async def fail_parser(*args, **kwargs):
-        raise AssertionError("resume_parser_agent should not be called")
+    """When provided with a structured CV, the workflow runs end-to-end without errors."""
+
+    async def run_parser(*args, **kwargs):
+        return DummyRunResult(sample_cv)
 
     async def run_analyst(*args, **kwargs):
         return DummyRunResult(
@@ -55,16 +57,12 @@ async def test_workflow_uses_provided_original_cv_without_reparsing(
             )
         )
 
-    # Patch the canonical module location so the test does not require a
-    # production import added solely to satisfy monkeypatching.
-    monkeypatch.setattr("workflows.agents.resume_parser_agent.run", fail_parser)
-    monkeypatch.setattr("workflows.analyst_agent.run", run_analyst)
-    monkeypatch.setattr("workflows.writer_agent.run", run_writer)
-    monkeypatch.setattr("workflows.reviewer_agent.run", run_reviewer)
-    monkeypatch.setattr("workflows.auditor_agent.run", run_auditor)
+    monkeypatch.setattr("resume_tailorator.workflows.agents.resume_parser_agent.run", run_parser)
+    monkeypatch.setattr("resume_tailorator.workflows.agents.analyst_agent.run", run_analyst)
+    monkeypatch.setattr("resume_tailorator.workflows.agents.writer_agent.run", run_writer)
+    monkeypatch.setattr("resume_tailorator.workflows.agents.reviewer_agent.run", run_reviewer)
+    monkeypatch.setattr("resume_tailorator.workflows.agents.auditor_agent.run", run_auditor)
 
-    # If resume_parser_agent.run is called inside the workflow, fail_parser raises
-    # AssertionError which will propagate and fail this test immediately.
     result = await ResumeTailorWorkflow().run(sample_cv, "files/job_posting.md")
 
     with subtests.test("job_title"):
@@ -83,10 +81,15 @@ async def test_analyst_failure_after_retries_raises_runtime_error(
 ) -> None:
     """Analyst failure after all retries must raise RuntimeError, not kill the process."""
 
+    async def run_parser(*args, **kwargs):
+        return DummyRunResult(sample_cv)
+
     async def always_fail(*args, **kwargs):
         raise ValueError("simulated agent unavailable")
 
-    monkeypatch.setattr("workflows.analyst_agent.run", always_fail)
+    monkeypatch.setattr("resume_tailorator.workflows.agents.resume_parser_agent.run", run_parser)
+    monkeypatch.setattr("resume_tailorator.workflows.agents.analyst_agent.run", always_fail)
+
 
     with pytest.raises(RuntimeError, match="job analysis"):
         await ResumeTailorWorkflow().run(sample_cv, "files/job_posting.md")

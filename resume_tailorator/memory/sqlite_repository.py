@@ -34,13 +34,13 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     ParsedOriginalResumeRecord,
     ResumeMemoryError,
     ResumeSourceRecord,
     TailoredResumeRecord,
 )
-from memory.repository import ResumeMemoryRepository
+from resume_tailorator.memory.repository import ResumeMemoryRepository
 
 # ---------------------------------------------------------------------------
 # SQL DDL
@@ -72,15 +72,16 @@ CREATE TABLE IF NOT EXISTS parsed_original_resumes (
 
 _CREATE_TAILORED_RESUMES = """
 CREATE TABLE IF NOT EXISTS tailored_resumes (
-    id                 TEXT PRIMARY KEY,
-    source_id          TEXT NOT NULL,
-    job_fingerprint    TEXT NOT NULL UNIQUE,
-    company_name       TEXT NOT NULL,
-    job_title          TEXT NOT NULL,
-    tailored_cv_json   TEXT NOT NULL,
-    audit_report_json  TEXT NOT NULL,
-    created_at         TEXT NOT NULL,
-    updated_at         TEXT NOT NULL,
+    id                    TEXT PRIMARY KEY,
+    source_id             TEXT NOT NULL,
+    job_fingerprint       TEXT NOT NULL UNIQUE,
+    company_name          TEXT NOT NULL,
+    job_title             TEXT NOT NULL,
+    tailored_cv_json      TEXT NOT NULL,
+    audit_report_json     TEXT NOT NULL,
+    job_posting_markdown  TEXT NOT NULL DEFAULT '',
+    created_at            TEXT NOT NULL,
+    updated_at            TEXT NOT NULL,
     FOREIGN KEY (source_id) REFERENCES original_resume_sources(id)
 )
 """
@@ -141,6 +142,7 @@ def _row_to_tailored(row: sqlite3.Row) -> TailoredResumeRecord:
         job_title=row["job_title"],
         tailored_cv_json=row["tailored_cv_json"],
         audit_report_json=row["audit_report_json"],
+        job_posting_markdown=row["job_posting_markdown"] or "",
         created_at=_parse_ts(row["created_at"]),
         updated_at=_parse_ts(row["updated_at"]),
     )
@@ -180,6 +182,18 @@ class SQLiteResumeMemoryRepository(ResumeMemoryRepository):
             self._conn.execute(_CREATE_ORIGINAL_RESUME_SOURCES)
             self._conn.execute(_CREATE_PARSED_ORIGINAL_RESUMES)
             self._conn.execute(_CREATE_TAILORED_RESUMES)
+            self._migrate_tailored_resumes()
+
+    def _migrate_tailored_resumes(self) -> None:
+        """Add job_posting_markdown column if upgrading from older schema."""
+        cur = self._conn.execute("PRAGMA table_info(tailored_resumes)")
+        columns = {row["name"] for row in cur.fetchall()}
+        if "job_posting_markdown" not in columns:
+            # SQLite <3.35 doesn't support ALTER TABLE ADD COLUMN ... DEFAULT
+            # but modern Pythons ship with SQLite >=3.35, so simple add works.
+            self._conn.execute(
+                "ALTER TABLE tailored_resumes ADD COLUMN job_posting_markdown TEXT NOT NULL DEFAULT ''"
+            )
 
     def _ensure_source_exists(self, source_id: str) -> None:
         """Raise ResumeMemoryError if source_id is not in the DB."""
@@ -385,6 +399,7 @@ class SQLiteResumeMemoryRepository(ResumeMemoryRepository):
         job_title: str,
         tailored_cv_json: str,
         audit_report_json: str,
+        job_posting_markdown: str = "",
     ) -> TailoredResumeRecord:
         # Validate source exists before attempting any writes.
         self._ensure_source_exists(source_id)
@@ -406,15 +421,17 @@ class SQLiteResumeMemoryRepository(ResumeMemoryRepository):
                 """
                 INSERT INTO tailored_resumes
                     (id, source_id, job_fingerprint, company_name, job_title,
-                     tailored_cv_json, audit_report_json, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     tailored_cv_json, audit_report_json, job_posting_markdown,
+                     created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(job_fingerprint) DO UPDATE SET
-                    source_id         = excluded.source_id,
-                    company_name      = excluded.company_name,
-                    job_title         = excluded.job_title,
-                    tailored_cv_json  = excluded.tailored_cv_json,
-                    audit_report_json = excluded.audit_report_json,
-                    updated_at        = excluded.updated_at
+                    source_id            = excluded.source_id,
+                    company_name         = excluded.company_name,
+                    job_title            = excluded.job_title,
+                    tailored_cv_json     = excluded.tailored_cv_json,
+                    audit_report_json    = excluded.audit_report_json,
+                    job_posting_markdown = excluded.job_posting_markdown,
+                    updated_at           = excluded.updated_at
                 """,
                 (
                     record_id,
@@ -424,6 +441,7 @@ class SQLiteResumeMemoryRepository(ResumeMemoryRepository):
                     job_title,
                     tailored_cv_json,
                     audit_report_json,
+                    job_posting_markdown,
                     created_at_str,
                     now_str,
                 ),
@@ -437,14 +455,31 @@ class SQLiteResumeMemoryRepository(ResumeMemoryRepository):
             job_title=job_title,
             tailored_cv_json=tailored_cv_json,
             audit_report_json=audit_report_json,
+            job_posting_markdown=job_posting_markdown,
             created_at=_parse_ts(created_at_str),
             updated_at=now,
         )
+
+    def get_source_by_id(self, source_id: str) -> ResumeSourceRecord | None:
+        cur = self._conn.execute(
+            "SELECT * FROM original_resume_sources WHERE id = ?",
+            (source_id,),
+        )
+        row = cur.fetchone()
+        return _row_to_source(row) if row else None
 
     def get_tailored_resume(self, job_fingerprint: str) -> TailoredResumeRecord | None:
         cur = self._conn.execute(
             "SELECT * FROM tailored_resumes WHERE job_fingerprint = ?",
             (job_fingerprint,),
+        )
+        row = cur.fetchone()
+        return _row_to_tailored(row) if row else None
+
+    def get_tailored_resume_by_id(self, record_id: str) -> TailoredResumeRecord | None:
+        cur = self._conn.execute(
+            "SELECT * FROM tailored_resumes WHERE id = ?",
+            (record_id,),
         )
         row = cur.fetchone()
         return _row_to_tailored(row) if row else None

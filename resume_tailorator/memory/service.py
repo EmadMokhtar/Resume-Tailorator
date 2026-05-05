@@ -16,15 +16,15 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from memory.models import (
+from resume_tailorator.memory.models import (
     MissingOriginalResumeError,
     ResumeMemoryError,
     ResolvedOriginalResume,
     TailoredResumeRecord,
 )
-from memory.parser import ResumeParserAdapter
-from memory.repository import ResumeMemoryRepository
-from models.agents.output import AuditResult, CV
+from resume_tailorator.memory.parser import ResumeParserAdapter
+from resume_tailorator.memory.repository import ResumeMemoryRepository
+from resume_tailorator.models.agents.output import AuditResult, CV
 
 
 def _hash_content(content: str) -> str:
@@ -160,6 +160,7 @@ class ResumeMemoryService:
         job_title: str,
         tailored_cv: CV,
         audit_result: AuditResult,
+        job_posting_markdown: str = "",
     ) -> TailoredResumeRecord:
         """Persist a completed tailored resume together with its audit report.
 
@@ -172,6 +173,7 @@ class ResumeMemoryService:
             job_title: Title of the target role.
             tailored_cv: The rewritten ``CV`` produced by the writer agent.
             audit_result: The ``AuditResult`` produced by the auditor agent.
+            job_posting_markdown: The job posting content in markdown format.
 
         Returns:
             The persisted ``TailoredResumeRecord``.
@@ -183,4 +185,5 @@ class ResumeMemoryService:
             job_title=job_title,
             tailored_cv_json=tailored_cv.model_dump_json(),
             audit_report_json=audit_result.model_dump_json(),
+            job_posting_markdown=job_posting_markdown,
         )
