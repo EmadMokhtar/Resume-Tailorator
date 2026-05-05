@@ -121,6 +121,8 @@ uv run python resume_tailorator/main.py tailor <JOB_URL> <RESUME_PATH>
 Upon successful completion, output files are saved in the `output/` directory (or the path specified via `--output-dir`):
 
 *   `tailored_resume_<Company_Name>.md` — Tailored resume in Markdown format
+*   `tailored_resume_<Company_Name>.pdf` — Tailored resume in PDF format
+*   `tailored_resume_<Company_Name>.docx` — Tailored resume in DOCX format
 *   `report_<company_name>.md` — Comprehensive self-review report
 
 ## 🧠 Resume Memory Behavior
