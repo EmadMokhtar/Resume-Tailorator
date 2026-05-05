@@ -352,14 +352,21 @@ async def _re_tailor_impl(
             console.print("📄 Using original resume from prior job")
             _resume_source_path = source.path
             resolved = service.resolve_original_resume(path=_resume_source_path)
+        elif source is not None:
+            # Original source is known but the file no longer exists on disk.
+            console.print(
+                f"[red]❌ Original resume not found at recorded path: {source.path}[/red]"
+            )
+            console.print(
+                "[yellow]💡 Tip: Re-run with --resume-path to provide the resume file.[/yellow]"
+            )
+            raise typer.Exit(code=1)
         else:
-            console.print("📄 Using latest stored resume")
-            try:
-                resolved = service.resolve_original_resume(path=None)
-                _resume_source_path = resolved.source.path
-            except Exception as e:
-                console.print(f"[red]❌ Could not resolve original resume: {e}[/red]")
-                raise typer.Exit(code=1)
+            console.print("[red]❌ No original resume source recorded for this job[/red]")
+            console.print(
+                "[yellow]💡 Tip: Re-run with --resume-path to provide the resume file.[/yellow]"
+            )
+            raise typer.Exit(code=1)
 
     # Read actual file content as text — never round-trip through parsed CV JSON.
     ext = os.path.splitext(_resume_source_path)[1].lower() if _resume_source_path else ""

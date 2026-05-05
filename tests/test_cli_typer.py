@@ -381,6 +381,9 @@ def test_re_tailor_success(tmp_path, monkeypatch) -> None:
     mock_workflow.run = AsyncMock(return_value=workflow_result)
     mock_generate_resume = MagicMock(return_value=str(output_dir / "tailored_resume_acme_corp.md"))
 
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Smith\n\nPython developer", encoding="utf-8")
+
     with (
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
@@ -396,7 +399,7 @@ def test_re_tailor_success(tmp_path, monkeypatch) -> None:
             job_fingerprint="fp123",
             job_posting_markdown="# Job Posting\nPython engineer",
         )
-        mock_repo.get_source_by_id.return_value = MagicMock(path="/resume.md")
+        mock_repo.get_source_by_id.return_value = MagicMock(path=str(resume_file))
         mock_repo_cls.return_value = mock_repo
 
         mock_parser = MagicMock()
@@ -404,7 +407,7 @@ def test_re_tailor_success(tmp_path, monkeypatch) -> None:
 
         mock_svc = MagicMock()
         mock_svc.resolve_original_resume.return_value = MagicMock(
-            source=MagicMock(id="src-123"),
+            source=MagicMock(id="src-123", path=str(resume_file)),
             cv=cv,
         )
         mock_svc_cls.return_value = mock_svc
@@ -458,6 +461,9 @@ def test_re_tailor_no_job_markdown(tmp_path, monkeypatch) -> None:
     output_dir.mkdir()
     monkeypatch.chdir(tmp_path)
 
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe\n\nPython developer.", encoding="utf-8")
+
     with patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls:
         mock_repo = MagicMock()
         mock_repo.get_tailored_resume_by_id.return_value = MagicMock(
@@ -467,7 +473,7 @@ def test_re_tailor_no_job_markdown(tmp_path, monkeypatch) -> None:
             job_fingerprint="fp123",
             job_posting_markdown="",
         )
-        mock_repo.get_source_by_id.return_value = MagicMock(path="/resume.md")
+        mock_repo.get_source_by_id.return_value = MagicMock(path=str(resume_file))
         mock_repo_cls.return_value = mock_repo
 
         with (
@@ -476,7 +482,7 @@ def test_re_tailor_no_job_markdown(tmp_path, monkeypatch) -> None:
         ):
             mock_svc = MagicMock()
             mock_svc.resolve_original_resume.return_value = MagicMock(
-                source=MagicMock(id="src-123"),
+                source=MagicMock(id="src-123", path=str(resume_file)),
                 cv=_make_cv(),
             )
             mock_svc_cls.return_value = mock_svc
@@ -586,3 +592,40 @@ def test_re_tailor_missing_resume_file(tmp_path, monkeypatch) -> None:
 
     assert result.exit_code == 1
     assert "not found" in result.output.lower() or "❌" in result.output
+
+
+def test_re_tailor_missing_original_source_file(tmp_path, monkeypatch) -> None:
+    """re_tailor should fail when original source file is gone and no --resume-path provided."""
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    with patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls:
+        mock_repo = MagicMock()
+        mock_repo.get_tailored_resume_by_id.return_value = MagicMock(
+            source_id="src-123",
+            company_name="Acme Corp",
+            job_title="Software Engineer",
+            job_fingerprint="fp123",
+            job_posting_markdown="# Job Posting",
+        )
+        # Source exists in DB but file is gone
+        mock_repo.get_source_by_id.return_value = MagicMock(
+            path="/nonexistent/resume.md"
+        )
+        mock_repo_cls.return_value = mock_repo
+
+        result = runner.invoke(
+            app,
+            [
+                "re-tailor",
+                "job-456",
+                "Add skills",
+                "--output-dir",
+                str(output_dir),
+            ],
+        )
+
+    assert result.exit_code == 1
+    assert "Original resume not found at recorded path" in result.output
+    assert "--resume-path" in result.output
