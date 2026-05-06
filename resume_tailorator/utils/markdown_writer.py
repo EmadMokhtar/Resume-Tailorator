@@ -21,6 +21,11 @@ def generate_resume(
         The path to the generated Markdown file.
     """
     os.makedirs(output_dir, exist_ok=True)
+    # Validate base_filename doesn't contain path separators or parent refs
+    if os.sep in base_filename or (os.altsep and os.altsep in base_filename):
+        raise ValueError(f"base_filename contains path separator: {base_filename}")
+    if ".." in base_filename:
+        raise ValueError(f"base_filename contains parent-directory reference: {base_filename}")
     md_output_path = os.path.join(output_dir, f"{base_filename}.md")
     pdf_output_path = os.path.join(output_dir, f"{base_filename}.pdf")
     docx_output_path = os.path.join(output_dir, f"{base_filename}.docx")

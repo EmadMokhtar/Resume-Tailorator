@@ -78,8 +78,10 @@ A helper in `main.py` that:
 1. Extracts `company_name`, `job_title` from `result`
 2. Extracts `full_name` from `cv`
 3. Gets current date for `timestamp`
-4. Replaces each `{variable}` in the template
-5. Slugifies the result
+4. Slugifies each extracted value (lowercase, spaces → `_`, unsafe chars stripped)
+5. Replaces each `{variable}` in the template with its slugified value
+
+> **Note:** Only the substituted variable values are slugified. Literal characters in the template (spaces, slashes, dots, etc.) are left unchanged. Any remaining `{unknown}` placeholders are also left as-is.
 
 ### `generate_resume()` (updated in `markdown_writer.py`)
 

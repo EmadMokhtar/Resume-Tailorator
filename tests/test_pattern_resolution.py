@@ -2,9 +2,7 @@
 
 from datetime import date
 
-import pytest
-
-from resume_tailorator.main import _resolve_pattern, _slugify
+from resume_tailorator.main import _is_safe_path_component, _resolve_pattern, _slugify
 from resume_tailorator.models.agents.output import CV, WorkExperience
 from resume_tailorator.models.workflow import ResumeTailorResult
 
@@ -120,3 +118,35 @@ class TestResolvePattern:
         actual = _resolve_pattern(template, result, cv)
         today = date.today().strftime("%Y%m%d")
         assert actual == today
+
+
+class TestIsSafePathComponent:
+    def test_normal_name_is_safe(self):
+        assert _is_safe_path_component("acme_corp-software_engineer")
+
+    def test_empty_is_unsafe(self):
+        assert not _is_safe_path_component("")
+
+    def test_dot_is_unsafe(self):
+        assert not _is_safe_path_component(".")
+
+    def test_double_dot_is_unsafe(self):
+        assert not _is_safe_path_component("..")
+
+    def test_parent_reference_in_middle_is_unsafe(self):
+        assert not _is_safe_path_component("foo..bar")
+
+    def test_forward_slash_is_unsafe(self):
+        assert not _is_safe_path_component("foo/bar")
+
+    def test_backslash_is_unsafe(self):
+        assert not _is_safe_path_component("foo\\bar")
+
+    def test_leading_slash_is_unsafe(self):
+        assert not _is_safe_path_component("/foo")
+
+    def test_absolute_windows_path_is_unsafe(self):
+        assert not _is_safe_path_component("C:")
+
+    def test_null_bytes_are_unsafe(self):
+        assert not _is_safe_path_component("foo\x00bar")

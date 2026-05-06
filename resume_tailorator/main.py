@@ -67,6 +67,25 @@ def _resolve_pattern(template: str, result: ResumeTailorResult, cv: CV) -> str:
     return resolved
 
 
+_INVALID_PATH_CHARS = re.compile(r"[\x00-\x1f\x7f<>:\"|?*]")
+
+
+def _is_safe_path_component(name: str) -> bool:
+    """Reject path components that could escape the intended directory."""
+    if not name or name == "." or ".." in name:
+        return False
+    # Reject path separators (forward slash everywhere, backslash on Windows)
+    if "/" in name or "\\" in name:
+        return False
+    # Reject control chars and other filesystem-dangerous characters
+    if _INVALID_PATH_CHARS.search(name):
+        return False
+    # Reject absolute paths
+    if name.startswith("/") or (len(name) > 1 and name[1] == ":"):
+        return False
+    return True
+
+
 def _audit_result_from_dict(audit_dict: dict) -> AuditResult:
     issues = [
         AuditIssue(
@@ -169,15 +188,40 @@ async def _run_workflow(
     resume_path = None
     report_path = None
 
-    # Parse CV once for pattern resolution (used in both passed and failed cases)
-    cv = CV.model_validate_json(result.tailored_resume)
+    # Guard CV parsing: workflow may return empty or invalid tailored_resume
+    full_name = ""
+    if result.tailored_resume:
+        try:
+            cv = CV.model_validate_json(result.tailored_resume)
+            full_name = cv.full_name
+        except Exception:
+            full_name = ""
+
+    # Build a minimal CV-like object for pattern resolution if parsing failed
+    cv_fallback = CV(
+        full_name=full_name or "unknown",
+        summary="",
+        skills=[],
+        experience=[],
+        education=[],
+    )
 
     # Resolve directory and file name patterns
-    job_dir_name = _resolve_pattern(output_pattern, result, cv)
+    job_dir_name = _resolve_pattern(output_pattern, result, cv_fallback)
+    if not _is_safe_path_component(job_dir_name):
+        console.print(
+            f"[red]❌ Invalid output pattern resolves to unsafe path: {job_dir_name}[/red]"
+        )
+        raise typer.Exit(code=1)
     job_dir = os.path.join(output_dir, job_dir_name)
     os.makedirs(job_dir, exist_ok=True)
 
-    resume_base_name = _resolve_pattern(resume_name_pattern, result, cv)
+    resume_base_name = _resolve_pattern(resume_name_pattern, result, cv_fallback)
+    if not _is_safe_path_component(resume_base_name):
+        console.print(
+            f"[red]❌ Invalid resume name pattern resolves to unsafe path: {resume_base_name}[/red]"
+        )
+        raise typer.Exit(code=1)
 
     if result.passed:
         console.print("\n✅ Audit Passed. Saving CV...")
