@@ -9,6 +9,7 @@ from resume_tailorator.models.agents.output import CV, CVDiff, FinalReport, JobA
 from resume_tailorator.models.workflow import ResumeTailorResult
 from resume_tailorator.utils.cv_diff import compute_cv_diff, compute_gap_analysis
 from resume_tailorator.workflows.agents import (
+    USAGE_LIMITS,
     _analyst_qs,
     _auditor_qs,
     _parser_qs,
@@ -121,6 +122,7 @@ class ResumeTailorWorkflow:
                 original_cv_result = await resume_parser_agent.run(
                     f"Parse this resume into structured format:\n\n{resume_text}",
                     usage=total_usage,
+                    usage_limits=USAGE_LIMITS,
                 )
 
                 if original_cv_result.output is None:
@@ -189,6 +191,7 @@ class ResumeTailorWorkflow:
                 job_analysis_result = await analyst_agent.run(
                     job_analysis_prompt,
                     usage=total_usage,
+                    usage_limits=USAGE_LIMITS,
                 )
 
                 print(f"   [Debug] Job Data: {job_analysis_result.output}")
@@ -295,7 +298,7 @@ Rewrite the CV to match the Job Analysis while addressing all audit feedback.
 """
 
             try:
-                writer_result = await writer_agent.run(writer_prompt, usage=total_usage)
+                writer_result = await writer_agent.run(writer_prompt, usage=total_usage, usage_limits=USAGE_LIMITS)
                 new_cv = writer_result.output or None
             except UnexpectedModelBehavior:
                 if _writer_qs.last_output is not None:
@@ -336,7 +339,7 @@ Assess quality and suggest improvements if needed.
 
                 try:
                     review_result = await reviewer_agent.run(
-                        review_prompt, usage=total_usage
+                        review_prompt, usage=total_usage, usage_limits=USAGE_LIMITS
                     )
                     review = review_result.output
 
@@ -380,7 +383,7 @@ Focus on better highlighting relevant experience and incorporating job keywords 
 """
 
                         refined_result = await writer_agent.run(
-                            improvement_prompt, usage=total_usage
+                            improvement_prompt, usage=total_usage, usage_limits=USAGE_LIMITS
                         )
                         if refined_result.output:
                             new_cv = refined_result.output
@@ -426,7 +429,7 @@ Compare the two structured CVs carefully. Ensure that:
 5. The new CV properly targets the job requirements using only original information
 """
             try:
-                audit_result = await auditor_agent.run(audit_prompt, usage=total_usage)
+                audit_result = await auditor_agent.run(audit_prompt, usage=total_usage, usage_limits=USAGE_LIMITS)
                 audit = audit_result.output
             except UnexpectedModelBehavior:
                 if _auditor_qs.last_output is not None:
@@ -519,7 +522,7 @@ Review Result: {review_json}
 Job Analysis: {job_data_json}
 """
 
-            report_result = await report_agent.run(report_prompt, usage=total_usage)
+            report_result = await report_agent.run(report_prompt, usage=total_usage, usage_limits=USAGE_LIMITS)
             narrative = report_result.output
 
             final_report = FinalReport(
