@@ -55,8 +55,10 @@ def reset_model() -> None:
 # Higher request limit for all agents
 MODEL_SETTINGS = {"request_limit": 1000}
 
-# Usage limiter shared across all agent calls to prevent premature cutoff
-USAGE_LIMITS = UsageLimits(request_limit=500)
+# Usage limiter shared across all agent calls to prevent premature cutoff.
+# Keep this aligned with MODEL_SETTINGS so the shared limiter does not
+# silently reduce the intended request budget.
+USAGE_LIMITS = UsageLimits(request_limit=MODEL_SETTINGS["request_limit"])
 
 # --- Quality Gate Agent ---
 # Universal reviewer: scores any pipeline agent's output 0-10 and requests improvements.
