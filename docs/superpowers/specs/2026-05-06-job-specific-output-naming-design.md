@@ -18,7 +18,7 @@ This design introduces job-specific subdirectories and user-configurable naming 
 
 - No migration of old output files — new runs use the new structure, old files stay where they are.
 - No GUI or interactive template builder.
-- No template validation beyond basic variable substitution.
+- No advanced template-language validation beyond variable substitution and the existing safety checks on resolved directory/file components (for example, rejecting separators, control characters, and absolute paths).
 
 ## Architecture
 
