@@ -81,7 +81,7 @@ A helper in `main.py` that:
 4. Slugifies each extracted value (lowercase, spaces → `_`, unsafe chars stripped)
 5. Replaces each `{variable}` in the template with its slugified value
 
-> **Note:** Only the substituted variable values are slugified. Literal characters in the template (spaces, slashes, dots, etc.) are left unchanged. Any remaining `{unknown}` placeholders are also left as-is.
+> **Note:** Only the substituted variable values are slugified. Literal characters in the template (spaces, dots, hyphens, etc.) are left unchanged, and any remaining `{unknown}` placeholders are also left as-is. However, the final resolved directory name or base filename must still be a single safe path component. Templates must not produce path separators such as `/` or `\`, and must not include absolute-path indicators, because those values are rejected during path-component validation.
 
 ### `generate_resume()` (updated in `markdown_writer.py`)
 
