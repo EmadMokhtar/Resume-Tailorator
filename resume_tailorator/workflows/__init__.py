@@ -86,6 +86,9 @@ class ResumeTailorWorkflow:
         job_content_file_path: str | None = None,
         job_content: str | None = None,
         model: str | None = None,
+        *,
+        pre_parsed_cv: CV | None = None,
+        debug: bool = False,
     ) -> ResumeTailorResult:
         """Run the resume tailoring workflow.
 
@@ -110,56 +113,62 @@ class ResumeTailorWorkflow:
 
         total_usage = RunUsage()
 
-        total_usage = RunUsage()
-
         # --- STEP 0: PARSE ORIGINAL RESUME ---
         self._set_stage("PARSING_RESUME")
-        print("🤖 Agent 0 (Parser): Parsing original resume...")
         original_cv_result: AgentRunResult[CV] | None = None
         original_cv: CV | None = None
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                original_cv_result = await resume_parser_agent.run(
-                    f"Parse this resume into structured format:\n\n{resume_text}",
-                    usage=total_usage,
-                    usage_limits=USAGE_LIMITS,
-                )
 
-                if original_cv_result.output is None:
-                    raise ValueError("Resume parsing returned None")
-
-                if (
-                    original_cv_result.output.full_name
-                    and original_cv_result.output.experience
-                ):
-                    break
-
-                print(
-                    f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete resume parse, retrying..."
-                )
-
-            except UnexpectedModelBehavior:
-                if _parser_qs.last_output is not None:
-                    print(
-                        "⚠️  Resume Parser quality gate exhausted — using best available output"
+        if pre_parsed_cv is not None:
+            print("♻️  Using cached parsed resume (skipping AI parsing)")
+            original_cv = pre_parsed_cv
+            if debug:
+                print(f"   [Debug] Pre-parsed CV has {len(original_cv.skills)} skills, "
+                      f"{len(original_cv.experience)} work experiences")
+        else:
+            print("🤖 Agent 0 (Parser): Parsing original resume...")
+            for attempt in range(self.MAX_RETRIES):
+                try:
+                    original_cv_result = await resume_parser_agent.run(
+                        f"Parse this resume into structured format:\n\n{resume_text}",
+                        usage=total_usage,
+                        usage_limits=USAGE_LIMITS,
                     )
-                    original_cv = _parser_qs.last_output
-                    break
-                self._complete_stage("PARSING_RESUME", success=False)
-                sys.exit(
-                    "❌ Resume Parser quality gate exhausted with no fallback available."
-                )
-            except Exception as e:
-                print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
-                if attempt == self.MAX_RETRIES - 1:
+
+                    if original_cv_result.output is None:
+                        raise ValueError("Resume parsing returned None")
+
+                    if (
+                        original_cv_result.output.full_name
+                        and original_cv_result.output.experience
+                    ):
+                        break
+
+                    print(
+                        f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES}: Incomplete resume parse, retrying..."
+                    )
+
+                except UnexpectedModelBehavior:
+                    if _parser_qs.last_output is not None:
+                        print(
+                            "⚠️  Resume Parser quality gate exhausted — using best available output"
+                        )
+                        original_cv = _parser_qs.last_output
+                        break
+                    self._complete_stage("PARSING_RESUME", success=False)
+                    sys.exit(
+                        "❌ Resume Parser quality gate exhausted with no fallback available."
+                    )
+                except Exception as e:
+                    print(f"⚠️ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
+                    if attempt == self.MAX_RETRIES - 1:
+                        self._complete_stage("PARSING_RESUME", success=False)
+                        sys.exit("❌ Failed to parse original resume after retries.")
+
+            if original_cv is None:
+                if original_cv_result is None or original_cv_result.output is None:
                     self._complete_stage("PARSING_RESUME", success=False)
                     sys.exit("❌ Failed to parse original resume after retries.")
-
-        if original_cv is None:
-            if original_cv_result is None or original_cv_result.output is None:
-                self._complete_stage("PARSING_RESUME", success=False)
-                sys.exit("❌ Failed to parse original resume after retries.")
-            original_cv = original_cv_result.output
+                original_cv = original_cv_result.output
 
         self._complete_stage("PARSING_RESUME")
         print(f"   ✅ Resume Parsed: {original_cv.full_name}")
