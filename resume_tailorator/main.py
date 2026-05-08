@@ -469,6 +469,7 @@ async def _re_tailor_impl(
     model: str | None,
     output_pattern: str = "{company_name}-{job_title}",
     resume_name_pattern: str = "{company_name}-{full_name}",
+    debug: bool = False,
 ) -> int:
     """Async implementation of re-tailor command."""
     os.makedirs(output_dir, exist_ok=True)
@@ -533,6 +534,17 @@ async def _re_tailor_impl(
             console.print(f"[red]❌ Error reading resume file: {e}[/red]")
             raise typer.Exit(code=1)
 
+    # Use the pre-parsed CV from the resolved original resume
+    pre_parsed_cv = resolved.cv if resolved else None
+    if debug:
+        content_hash = hashlib.sha256(resume_content.encode()).hexdigest()
+        console.print(f"🔍 [Debug] Content hash: {content_hash}")
+        if pre_parsed_cv:
+            console.print(
+                f"🔍 [Debug] Using pre-parsed CV with "
+                f"{len(pre_parsed_cv.skills)} skills"
+            )
+
     job_posting_markdown = tailored_record.job_posting_markdown
     if not job_posting_markdown:
         console.print("[red]❌ No job posting content stored for this job[/red]")
@@ -548,6 +560,8 @@ async def _re_tailor_impl(
         recommendations=recommendations,
         output_pattern=output_pattern,
         resume_name_pattern=resume_name_pattern,
+        pre_parsed_cv=pre_parsed_cv,
+        debug=debug,
     )
 
     if exit_code == 0:
@@ -597,6 +611,9 @@ def re_tailor(
         "{company_name}-{full_name}",
         help="Template for the resume file base name (without extension)",
     ),
+    debug: bool = typer.Option(
+        False, "--debug", "-d", help="Enable debug output and save converted resume"
+    ),
 ) -> int:
     """Re-run tailoring with recommendations from a prior audit."""
     return asyncio.run(
@@ -608,6 +625,7 @@ def re_tailor(
             model,
             output_pattern=output_pattern,
             resume_name_pattern=resume_name_pattern,
+            debug=debug,
         )
     )
 
