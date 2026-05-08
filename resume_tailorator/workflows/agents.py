@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai import Agent, AgentRunResultEvent, ModelRetry, PartDeltaEvent, RunContext
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import TextPartDelta, ThinkingPartDelta
 from pydantic_ai.usage import Usage, UsageLimits
@@ -71,6 +72,8 @@ async def run_agent(
         return await agent.run(prompt, usage=usage, usage_limits=usage_limits)
 
     except (KeyboardInterrupt, asyncio.CancelledError):
+        raise
+    except (ModelRetry, UnexpectedModelBehavior):
         raise
     except Exception:
         logger.warning(
