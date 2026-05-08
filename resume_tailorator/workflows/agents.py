@@ -1,9 +1,14 @@
+import asyncio
 import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
-from pydantic_ai import Agent, ModelRetry, RunContext
-from pydantic_ai.usage import UsageLimits
+from pydantic_ai import Agent, AgentRunResultEvent, ModelRetry, PartDeltaEvent, RunContext
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.agent import AgentRunResult
+from pydantic_ai.messages import TextPartDelta, ThinkingPartDelta
+from pydantic_ai.usage import Usage, UsageLimits
+from rich.console import Console
 
 from resume_tailorator.models.agents.output import (
     AuditResult,
@@ -20,6 +25,66 @@ from resume_tailorator.tools.job_scraper_helpers import (
 )
 
 logger = logging.getLogger(__name__)
+_console = Console()
+
+
+async def run_agent(
+    agent: Agent,
+    prompt: str,
+    *,
+    verbose: bool = False,
+    agent_label: str = "",
+    usage: Usage | None = None,
+    usage_limits: UsageLimits | None = None,
+) -> AgentRunResult:
+    """Run an agent, optionally streaming output in verbose mode."""
+    if not verbose:
+        return await agent.run(prompt, usage=usage, usage_limits=usage_limits)
+
+    if agent_label:
+        _console.print(f"\n[dim yellow]♨️  [{agent_label}][/dim yellow]")
+
+    _console.print(
+        f"[dim italic]Prompt: {prompt[:300]}{'...' if len(prompt) > 300 else ''}[/dim italic]"
+    )
+
+    try:
+        result = None
+        async for event in agent.run_stream_events(
+            prompt, usage=usage, usage_limits=usage_limits
+        ):
+            if isinstance(event, AgentRunResultEvent):
+                result = event.result
+            elif isinstance(event, PartDeltaEvent):
+                if isinstance(event.delta, TextPartDelta):
+                    _console.print(
+                        event.delta.content_delta, end="", style="green", markup=False
+                    )
+                elif isinstance(event.delta, ThinkingPartDelta):
+                    _console.print(
+                        event.delta.content_delta, end="", style="dim cyan", markup=False
+                    )
+
+        _console.print()
+
+        if result is not None:
+            return result
+        return await agent.run(prompt, usage=usage, usage_limits=usage_limits)
+
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        raise
+    except (ModelRetry, UnexpectedModelBehavior):
+        raise
+    except Exception:
+        logger.warning(
+            "verbose_stream_failed_falling_back",
+            extra={"agent_label": agent_label},
+            exc_info=True,
+        )
+        _console.print(
+            f"[yellow]⚠️  Stream interrupted for [{agent_label}], falling back to non-streaming...[/yellow]"
+        )
+        return await agent.run(prompt, usage=usage, usage_limits=usage_limits)
 
 
 class _QualityState(BaseModel):
@@ -342,8 +407,11 @@ report_agent = Agent(
 async def _validate_resume_parser(ctx: RunContext[None], output: CV) -> CV:
     """Score the resume parser output. Raises ModelRetry if score < 9."""
     _parser_qs.last_output = output
-    result = await quality_gate_agent.run(
+    result = await run_agent(
+        quality_gate_agent,
         f"Role: Resume Parser\nOutput:\n{output.model_dump_json(indent=2)}",
+        verbose=False,
+        agent_label="Quality Gate",
         usage=ctx.usage,
         usage_limits=USAGE_LIMITS,
     )
@@ -360,8 +428,11 @@ async def _validate_resume_parser(ctx: RunContext[None], output: CV) -> CV:
 async def _validate_auditor(ctx: RunContext[None], output: AuditResult) -> AuditResult:
     """Score the auditor output. Raises ModelRetry if score < 9."""
     _auditor_qs.last_output = output
-    result = await quality_gate_agent.run(
+    result = await run_agent(
+        quality_gate_agent,
         f"Role: Auditor\nOutput:\n{output.model_dump_json(indent=2)}",
+        verbose=False,
+        agent_label="Quality Gate",
         usage=ctx.usage,
         usage_limits=USAGE_LIMITS,
     )
@@ -548,8 +619,11 @@ def validate_extraction(raw_html: str, extracted_markdown: str) -> dict:
 async def _validate_cover_letter_writer(ctx: RunContext[None], output: str) -> str:
     """Score the cover letter output. Raises ModelRetry if score < 9."""
     _cover_qs.last_output = output
-    result = await quality_gate_agent.run(
+    result = await run_agent(
+        quality_gate_agent,
         f"Role: Cover Letter Writer\nOutput:\n{output}",
+        verbose=False,
+        agent_label="Quality Gate",
         usage=ctx.usage,
         usage_limits=USAGE_LIMITS,
     )
@@ -566,8 +640,11 @@ async def _validate_cover_letter_writer(ctx: RunContext[None], output: str) -> s
 async def _validate_analyst(ctx: RunContext[None], output: JobAnalysis) -> JobAnalysis:
     """Score the job analyst output. Raises ModelRetry if score < 9."""
     _analyst_qs.last_output = output
-    result = await quality_gate_agent.run(
+    result = await run_agent(
+        quality_gate_agent,
         f"Role: Job Analyst\nOutput:\n{output.model_dump_json(indent=2)}",
+        verbose=False,
+        agent_label="Quality Gate",
         usage=ctx.usage,
         usage_limits=USAGE_LIMITS,
     )
@@ -584,8 +661,11 @@ async def _validate_analyst(ctx: RunContext[None], output: JobAnalysis) -> JobAn
 async def _validate_writer(ctx: RunContext[None], output: CV) -> CV:
     """Score the writer output. Raises ModelRetry if score < 9."""
     _writer_qs.last_output = output
-    result = await quality_gate_agent.run(
+    result = await run_agent(
+        quality_gate_agent,
         f"Role: CV Writer\nOutput:\n{output.model_dump_json(indent=2)}",
+        verbose=False,
+        agent_label="Quality Gate",
         usage=ctx.usage,
         usage_limits=USAGE_LIMITS,
     )

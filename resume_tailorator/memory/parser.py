@@ -88,14 +88,25 @@ class PydanticAIResumeParser(ResumeParserAdapter):
             Structured ``CV`` instance produced by the agent.
 
         Raises:
-            ValueError: If the agent returns no structured output.
+            ValueError: If the agent returns no structured output or quality
+                gate is exhausted with no fallback.
             TypeError: If the agent returns a payload that is not a ``CV``.
         """
-        # Lazy import to avoid OpenAI client instantiation at module load time.
-        from resume_tailorator.workflows.agents import resume_parser_agent  # noqa: PLC0415
+        from pydantic_ai.exceptions import UnexpectedModelBehavior  # noqa: PLC0415
+        from resume_tailorator.workflows.agents import (  # noqa: PLC0415
+            _parser_qs,
+            resume_parser_agent,
+        )
 
-        result = resume_parser_agent.run_sync(content)
-        return self._validate_output(result.output)
+        try:
+            result = resume_parser_agent.run_sync(content)
+            return self._validate_output(result.output)
+        except UnexpectedModelBehavior:
+            if _parser_qs.last_output is not None:
+                return self._validate_output(_parser_qs.last_output)
+            raise ValueError(
+                "Resume parser quality gate exhausted with no fallback available."
+            )
 
     async def aparse(self, content: str) -> CV:
         """Asynchronously parse *content* using the resume parser agent.
@@ -109,14 +120,25 @@ class PydanticAIResumeParser(ResumeParserAdapter):
             Structured ``CV`` instance produced by the agent.
 
         Raises:
-            ValueError: If the agent returns no structured output.
+            ValueError: If the agent returns no structured output or quality
+                gate is exhausted with no fallback.
             TypeError: If the agent returns a payload that is not a ``CV``.
         """
-        # Lazy import to avoid OpenAI client instantiation at module load time.
-        from resume_tailorator.workflows.agents import resume_parser_agent  # noqa: PLC0415
+        from pydantic_ai.exceptions import UnexpectedModelBehavior  # noqa: PLC0415
+        from resume_tailorator.workflows.agents import (  # noqa: PLC0415
+            _parser_qs,
+            resume_parser_agent,
+        )
 
-        result = await resume_parser_agent.run(content)
-        return self._validate_output(result.output)
+        try:
+            result = await resume_parser_agent.run(content)
+            return self._validate_output(result.output)
+        except UnexpectedModelBehavior:
+            if _parser_qs.last_output is not None:
+                return self._validate_output(_parser_qs.last_output)
+            raise ValueError(
+                "Resume parser quality gate exhausted with no fallback available."
+            )
 
     def _validate_output(self, output) -> CV:
         """Validate agent output is a non-None ``CV``."""
