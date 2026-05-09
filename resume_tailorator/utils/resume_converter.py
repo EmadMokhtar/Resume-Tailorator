@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Protocol
 
@@ -44,6 +45,52 @@ class UnsupportedOutputFormatError(ResumeConverterError):
 
 
 # ---------------------------------------------------------------------------
+# Post-processing helpers
+# ---------------------------------------------------------------------------
+
+
+def _is_section_header(line: str) -> bool:
+    """True if *line* looks like a section header (all caps, no markdown formatting)."""
+    if not line:
+        return False
+    # Must not contain markdown formatting characters
+    if any(c in line for c in "**#[]()"):
+        return False
+    # Strip common non-alpha characters that could appear in headers, then
+    # check the remaining characters are all uppercase letters.
+    cleaned = re.sub(r"[\s/&]", "", line)
+    return len(cleaned) >= 2 and cleaned.isupper()
+
+
+def _normalize_markdown_headings(markdown: str) -> str:
+    """Convert all-caps section header lines to markdown H2 headings.
+
+    A line is promoted to a heading when:
+    * It consists entirely of uppercase text (with optional spaces, /, &)
+    * It contains no existing markdown formatting (**, #, [, ], (, ))
+    * It is at least 2 characters long
+    * It is not already a heading (doesn't start with #)
+    * It stands alone (preceded by a blank line; this naturally filters out
+      inline bold labels like **Programming Languages:** that sit within a
+      paragraph block).
+    """
+    lines = markdown.split("\n")
+    result: list[str] = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        prev_blank = i == 0 or not lines[i - 1].strip()
+        if (
+            prev_blank
+            and _is_section_header(stripped)
+            and not stripped.startswith("#")
+        ):
+            result.append(f"## {stripped}")
+        else:
+            result.append(line)
+    return "\n".join(result)
+
+
+# ---------------------------------------------------------------------------
 # Protocol
 # ---------------------------------------------------------------------------
 
@@ -76,7 +123,7 @@ class DocxInputConverter:
 
             md = MarkItDown()
             result = md.convert(str(input_path))
-            markdown = result.text_content
+            markdown = _normalize_markdown_headings(result.text_content)
         except ConversionFailedError:
             raise
         except Exception as exc:
@@ -106,7 +153,7 @@ class PdfInputConverter:
 
             md = MarkItDown()
             result = md.convert(str(input_path))
-            markdown = result.text_content
+            markdown = _normalize_markdown_headings(result.text_content)
         except ConversionFailedError:
             raise
         except Exception as exc:
