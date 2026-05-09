@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 
 from resume_tailorator.models.agents.output import CV
 
-_PARSER_VERSION = "1.0.0"
+_PARSER_VERSION = "1.1.0"
 
 
 class ResumeParserAdapter(ABC):

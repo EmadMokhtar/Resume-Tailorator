@@ -191,3 +191,93 @@ class TestAutoDetectResume:
         non_existent = tmp_path / "no_such_dir"
         with pytest.raises(NoResumeFileFoundError, match="does not exist"):
             auto_detect_resume(non_existent)
+
+
+# ---------------------------------------------------------------------------
+# Heading normalization
+# ---------------------------------------------------------------------------
+
+from resume_tailorator.utils.resume_converter import (
+    _is_section_header,
+    _normalize_markdown_headings,
+)
+
+
+class TestIsSectionHeader:
+    def test_all_caps_is_header(self):
+        assert _is_section_header("SKILLS") is True
+
+    def test_multi_word_all_caps_is_header(self):
+        assert _is_section_header("PROFESSIONAL SUMMARY") is True
+        assert _is_section_header("WORK EXPERIENCE") is True
+
+    def test_with_slash_is_header(self):
+        assert _is_section_header("CERTIFICATIONS/LICENSES") is True
+
+    def test_with_ampersand_is_header(self):
+        assert _is_section_header("AI & LLM") is True
+
+    def test_bold_text_not_header(self):
+        assert _is_section_header("**Emad Mokhtar**") is False
+        assert _is_section_header("**Programming Languages:** Go, Python") is False
+
+    def test_hashtag_not_header(self):
+        assert _is_section_header("## Already a heading") is False
+
+    def test_mixed_case_not_header(self):
+        assert _is_section_header("Senior Engineer at Acme") is False
+
+    def test_empty_not_header(self):
+        assert _is_section_header("") is False
+        assert _is_section_header("   ") is False
+
+    def test_numbers_not_header(self):
+        assert _is_section_header("2020-2024") is False
+
+    def test_contact_line_not_header(self):
+        assert _is_section_header("+31 (6) 45955236 | me@emadmokhtar.com | Rotterdam") is False
+
+    def test_single_char_not_header(self):
+        assert _is_section_header("A") is False
+
+
+class TestNormalizeMarkdownHeadings:
+    def test_converts_standalone_all_caps_line(self):
+        input_md = "Some text\n\nSKILLS\n\nMore text"
+        output = _normalize_markdown_headings(input_md)
+        assert "## SKILLS" in output
+        assert "SKILLS\n" not in output.replace("## SKILLS\n", "")
+
+    def test_does_not_convert_already_heading(self):
+        input_md = "Some text\n\n## SKILLS\n\nMore text"
+        output = _normalize_markdown_headings(input_md)
+        assert output.count("## SKILLS") == 1
+
+    def test_does_not_convert_inline_bold_label(self):
+        input_md = "**Programming Languages:** Go, Python"
+        output = _normalize_markdown_headings(input_md)
+        assert "## **Programming Languages:**" not in output
+        assert output.rstrip() == input_md
+
+    def test_multiple_headers(self):
+        input_md = "intro\n\nSKILLS\n\ncontent\n\nPROJECTS\n\nmore"
+        output = _normalize_markdown_headings(input_md)
+        assert "## SKILLS" in output
+        assert "## PROJECTS" in output
+
+    def test_header_at_document_start(self):
+        input_md = "SKILLS\n\ncontent"
+        output = _normalize_markdown_headings(input_md)
+        assert output.startswith("## SKILLS")
+
+    def test_header_at_document_end(self):
+        input_md = "content\n\nSKILLS"
+        output = _normalize_markdown_headings(input_md)
+        assert output.endswith("## SKILLS")
+
+    def test_preserves_blank_lines(self):
+        input_md = "a\n\nSKILLS\n\nb"
+        output = _normalize_markdown_headings(input_md)
+        lines = output.split("\n")
+        assert lines[1] == ""
+        assert lines[3] == ""

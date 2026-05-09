@@ -172,6 +172,8 @@ async def _run_workflow(
     verbose: bool = False,
     output_pattern: str = "{company_name}-{job_title}",
     resume_name_pattern: str = "{company_name}-{full_name}",
+    pre_parsed_cv: CV | None = None,
+    debug: bool = False,
 ) -> tuple[int, str | None, str | None, ResumeTailorResult]:
     workflow = ResumeTailorWorkflow()
 
@@ -185,6 +187,8 @@ async def _run_workflow(
         resume_content,
         job_content=job_content,
         model=model,
+        pre_parsed_cv=pre_parsed_cv,
+        debug=debug,
         verbose=verbose,
     )
 
@@ -218,6 +222,16 @@ async def _run_workflow(
         raise typer.Exit(code=1)
     job_dir = os.path.join(output_dir, job_dir_name)
     os.makedirs(job_dir, exist_ok=True)
+
+    if debug:
+        debug_path = os.path.join(job_dir, "resume_debug.md")
+        with open(debug_path, "w", encoding="utf-8") as f:
+            f.write(resume_content)
+        console.print(f"🔍 [Debug] Converted resume saved to: {debug_path}")
+        console.print(
+            f"🔍 [Debug] First 500 chars of resume sent to parser:\n"
+            f"{resume_content[:500]}"
+        )
 
     resume_base_name = _resolve_pattern(resume_name_pattern, result, cv_fallback)
     if not _is_safe_path_component(resume_base_name):
@@ -260,6 +274,7 @@ async def _tailor_impl(
     verbose: bool = False,
     output_pattern: str = "{company_name}-{job_title}",
     resume_name_pattern: str = "{company_name}-{full_name}",
+    debug: bool = False,
 ) -> int:
     """Async implementation of tailor command."""
     if not job_url.startswith(("http://", "https://")):
@@ -308,6 +323,30 @@ async def _tailor_impl(
         console.print("[red]❌ Resume content is empty[/red]")
         raise typer.Exit(code=1)
 
+    # Compute content hash and check cache before running the workflow
+    content_hash = hashlib.sha256(resume_content.encode()).hexdigest()
+    pre_parsed_cv: CV | None = None
+    try:
+        repo = SQLiteResumeMemoryRepository()
+        parser = PydanticAIResumeParser()
+        service = ResumeMemoryService(repository=repo, parser=parser)
+        resolved = await service.aresolve_original_resume(
+            path=(converted_resume_path or resume_path_expanded)
+        )
+        pre_parsed_cv = resolved.cv
+        if debug:
+            console.print(f"🔍 [Debug] Content hash: {content_hash}")
+            console.print(
+                f"🔍 [Debug] Cache hit: using pre-parsed CV with "
+                f"{len(pre_parsed_cv.skills)} skills"
+            )
+    except Exception:
+        if debug:
+            console.print(
+                "[yellow]🔍 [Debug] Cache miss or error — will parse with AI[/yellow]"
+            )
+        pre_parsed_cv = None
+
     logger.info("scraping_job_posting", extra={"url": job_url})
     try:
         scrape_result = await run_agent(
@@ -350,6 +389,8 @@ async def _tailor_impl(
         verbose=verbose,
         output_pattern=output_pattern,
         resume_name_pattern=resume_name_pattern,
+        pre_parsed_cv=pre_parsed_cv,
+        debug=debug,
     )
 
     if exit_code == 0:
@@ -412,6 +453,9 @@ def tailor(
         "{company_name}-{full_name}",
         help="Template for the resume file base name (without extension)",
     ),
+    debug: bool = typer.Option(
+        False, "--debug", "-d", help="Enable debug output and save converted resume"
+    ),
 ) -> int:
     """Run the full resume tailoring workflow."""
     return asyncio.run(
@@ -423,6 +467,7 @@ def tailor(
             verbose=verbose,
             output_pattern=output_pattern,
             resume_name_pattern=resume_name_pattern,
+            debug=debug,
         )
     )
 
@@ -436,6 +481,7 @@ async def _re_tailor_impl(
     verbose: bool = False,
     output_pattern: str = "{company_name}-{job_title}",
     resume_name_pattern: str = "{company_name}-{full_name}",
+    debug: bool = False,
 ) -> int:
     """Async implementation of re-tailor command."""
     os.makedirs(output_dir, exist_ok=True)
@@ -500,6 +546,17 @@ async def _re_tailor_impl(
             console.print(f"[red]❌ Error reading resume file: {e}[/red]")
             raise typer.Exit(code=1)
 
+    # Use the pre-parsed CV from the resolved original resume
+    pre_parsed_cv = resolved.cv if resolved else None
+    if debug:
+        content_hash = hashlib.sha256(resume_content.encode()).hexdigest()
+        console.print(f"🔍 [Debug] Content hash: {content_hash}")
+        if pre_parsed_cv:
+            console.print(
+                f"🔍 [Debug] Using pre-parsed CV with "
+                f"{len(pre_parsed_cv.skills)} skills"
+            )
+
     job_posting_markdown = tailored_record.job_posting_markdown
     if not job_posting_markdown:
         console.print("[red]❌ No job posting content stored for this job[/red]")
@@ -516,6 +573,8 @@ async def _re_tailor_impl(
         verbose=verbose,
         output_pattern=output_pattern,
         resume_name_pattern=resume_name_pattern,
+        pre_parsed_cv=pre_parsed_cv,
+        debug=debug,
     )
 
     if exit_code == 0:
@@ -568,6 +627,9 @@ def re_tailor(
         "{company_name}-{full_name}",
         help="Template for the resume file base name (without extension)",
     ),
+    debug: bool = typer.Option(
+        False, "--debug", "-d", help="Enable debug output and save converted resume"
+    ),
 ) -> int:
     """Re-run tailoring with recommendations from a prior audit."""
     return asyncio.run(
@@ -580,6 +642,7 @@ def re_tailor(
             verbose=verbose,
             output_pattern=output_pattern,
             resume_name_pattern=resume_name_pattern,
+            debug=debug,
         )
     )
 

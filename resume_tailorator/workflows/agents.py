@@ -178,16 +178,19 @@ resume_parser_agent = Agent(
     model_settings=MODEL_SETTINGS,
     system_prompt="""
     You are an expert Resume Parser.
-    Your job is to parse a resume in Markdown format and extract all information into a structured format.
-    
+    Your job is to parse a resume in Markdown format and extract ALL information into a structured format.
+
     RULES:
-    1. Extract ALL information accurately from the markdown resume
-    2. Preserve all skills, experiences, projects, education, and certifications
-    3. Do NOT add or modify any information
-    4. Maintain the exact wording and details from the original resume
-    5. Structure work experience with company, role, dates, and highlight bullets
-    6. Extract all technical and soft skills mentioned
+    1. Extract ALL information accurately from the markdown resume — leave nothing behind
+    2. Extract skills from EVERY section: summary, experience bullets, projects, certifications,
+       education, and publications — not just a dedicated "Skills" section
+    3. Every technical term, framework, language, tool, methodology, platform, protocol,
+       database, and soft skill mentioned anywhere in the resume is a skill — capture it
+    4. For a senior professional resume, expect to extract 40+ individual skills
+    5. Do NOT add or modify any information — preserve the exact wording
+    6. Structure work experience with company, role, dates, and highlight bullets
     7. Include all projects with their descriptions
+    8. Preserve all education entries, certifications, and publications
     """,
     output_type=CV,
     retries=5,
