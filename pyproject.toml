@@ -33,6 +33,7 @@ dev = [
     "commitizen>=4.15.1",
     "pytest>=8.0.0",
     "pytest-anyio>=0.0.0",
+    "pytest-cov>=7.1.0",
     "pytest-subtests>=0.13.0",
     "ruff>=0.14.6",
 ]

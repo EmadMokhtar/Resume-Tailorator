@@ -90,10 +90,8 @@ async def test_workflow_uses_provided_original_cv_without_reparsing(
 
 
 @pytest.mark.anyio
-async def test_analyst_failure_after_retries_raises_runtime_error(
-    monkeypatch, sample_cv
-) -> None:
-    """Analyst failure after all retries must raise RuntimeError, not kill the process."""
+async def test_analyst_failure_after_retries_exits(monkeypatch, sample_cv) -> None:
+    """Analyst failure after all retries exits with a user-facing message."""
 
     async def run_parser(*args, **kwargs):
         return DummyRunResult(sample_cv)
