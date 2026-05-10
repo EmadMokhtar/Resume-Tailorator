@@ -544,7 +544,10 @@ def test_parser_raises_when_agent_returns_no_output(
     monkeypatch.setitem(
         sys.modules,
         "resume_tailorator.workflows.agents",
-        SimpleNamespace(resume_parser_agent=_FakeAgent(), _parser_qs=SimpleNamespace(last_output=None)),
+        SimpleNamespace(
+            resume_parser_agent=_FakeAgent(),
+            _parser_qs=SimpleNamespace(last_output=None),
+        ),
     )
 
     parser = PydanticAIResumeParser()
@@ -565,7 +568,10 @@ def test_parser_raises_when_agent_returns_invalid_output_type(
     monkeypatch.setitem(
         sys.modules,
         "resume_tailorator.workflows.agents",
-        SimpleNamespace(resume_parser_agent=_FakeAgent(), _parser_qs=SimpleNamespace(last_output=None)),
+        SimpleNamespace(
+            resume_parser_agent=_FakeAgent(),
+            _parser_qs=SimpleNamespace(last_output=None),
+        ),
     )
 
     parser = PydanticAIResumeParser()
