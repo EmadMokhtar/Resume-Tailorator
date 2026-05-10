@@ -3,7 +3,13 @@ import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
-from pydantic_ai import Agent, AgentRunResultEvent, ModelRetry, PartDeltaEvent, RunContext
+from pydantic_ai import (
+    Agent,
+    AgentRunResultEvent,
+    ModelRetry,
+    PartDeltaEvent,
+    RunContext,
+)
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import TextPartDelta, ThinkingPartDelta
@@ -62,7 +68,10 @@ async def run_agent(
                     )
                 elif isinstance(event.delta, ThinkingPartDelta):
                     _console.print(
-                        event.delta.content_delta, end="", style="dim cyan", markup=False
+                        event.delta.content_delta,
+                        end="",
+                        style="dim cyan",
+                        markup=False,
                     )
 
         _console.print()
@@ -103,19 +112,23 @@ _cover_qs = _QualityState()
 MODEL_NAME = "openai:gpt-5-mini"
 _original_model = MODEL_NAME
 
+
 def get_model() -> str:
     """Get the currently active model name."""
     return MODEL_NAME
+
 
 def set_model(model: str) -> None:
     """Override the model for all agents."""
     global MODEL_NAME
     MODEL_NAME = model
 
+
 def reset_model() -> None:
     """Reset model to the original default."""
     global MODEL_NAME
     MODEL_NAME = _original_model
+
 
 MODEL_SETTINGS: dict = {}
 USAGE_LIMITS = UsageLimits(request_limit=1000)

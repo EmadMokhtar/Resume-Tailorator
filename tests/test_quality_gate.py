@@ -39,7 +39,7 @@ QC_FAIL = {"score": 5, "reasoning": "Needs improvement.", "improvements": ["Fix 
 @pytest.fixture(autouse=True)
 def reset_quality_states():
     """Reset all _QualityState singletons before and after each test."""
-    from workflows.agents import (
+    from resume_tailorator.workflows.agents import (
         _analyst_qs,
         _auditor_qs,
         _cover_qs,
@@ -60,7 +60,10 @@ def reset_quality_states():
 
 
 def test_resume_parser_validator_passes_when_score_9():
-    from workflows.agents import quality_gate_agent, resume_parser_agent
+    from resume_tailorator.workflows.agents import (
+        quality_gate_agent,
+        resume_parser_agent,
+    )
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
         with resume_parser_agent.override(
@@ -72,7 +75,11 @@ def test_resume_parser_validator_passes_when_score_9():
 
 
 def test_resume_parser_validator_saves_last_output_when_score_low():
-    from workflows.agents import _parser_qs, quality_gate_agent, resume_parser_agent
+    from resume_tailorator.workflows.agents import (
+        _parser_qs,
+        quality_gate_agent,
+        resume_parser_agent,
+    )
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
         with resume_parser_agent.override(
@@ -99,7 +106,7 @@ SAMPLE_AUDIT = {
 
 
 def test_auditor_validator_passes_when_score_9():
-    from workflows.agents import auditor_agent, quality_gate_agent
+    from resume_tailorator.workflows.agents import auditor_agent, quality_gate_agent
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
         with auditor_agent.override(model=TestModel(custom_output_args=SAMPLE_AUDIT)):
@@ -109,7 +116,11 @@ def test_auditor_validator_passes_when_score_9():
 
 
 def test_auditor_validator_saves_last_output_when_score_low():
-    from workflows.agents import _auditor_qs, auditor_agent, quality_gate_agent
+    from resume_tailorator.workflows.agents import (
+        _auditor_qs,
+        auditor_agent,
+        quality_gate_agent,
+    )
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
         with auditor_agent.override(model=TestModel(custom_output_args=SAMPLE_AUDIT)):
@@ -128,7 +139,10 @@ SAMPLE_COVER_LETTER = "Dear Hiring Manager,\n\nI am excited to apply for the Bac
 
 
 def test_cover_letter_validator_passes_when_score_9():
-    from workflows.agents import cover_letter_writer_agent, quality_gate_agent
+    from resume_tailorator.workflows.agents import (
+        cover_letter_writer_agent,
+        quality_gate_agent,
+    )
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
         with cover_letter_writer_agent.override(
@@ -140,7 +154,7 @@ def test_cover_letter_validator_passes_when_score_9():
 
 
 def test_cover_letter_validator_saves_last_output_when_score_low():
-    from workflows.agents import (
+    from resume_tailorator.workflows.agents import (
         _cover_qs,
         cover_letter_writer_agent,
         quality_gate_agent,
@@ -173,7 +187,7 @@ SAMPLE_JOB = {
 
 
 def test_analyst_validator_passes_when_score_9():
-    from workflows.agents import analyst_agent, quality_gate_agent
+    from resume_tailorator.workflows.agents import analyst_agent, quality_gate_agent
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
         with analyst_agent.override(model=TestModel(custom_output_args=SAMPLE_JOB)):
@@ -183,7 +197,11 @@ def test_analyst_validator_passes_when_score_9():
 
 
 def test_analyst_validator_saves_last_output_when_score_low():
-    from workflows.agents import _analyst_qs, analyst_agent, quality_gate_agent
+    from resume_tailorator.workflows.agents import (
+        _analyst_qs,
+        analyst_agent,
+        quality_gate_agent,
+    )
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
         with analyst_agent.override(model=TestModel(custom_output_args=SAMPLE_JOB)):
@@ -200,7 +218,7 @@ def test_analyst_validator_saves_last_output_when_score_low():
 
 
 def test_writer_validator_passes_when_score_9():
-    from workflows.agents import writer_agent, quality_gate_agent
+    from resume_tailorator.workflows.agents import writer_agent, quality_gate_agent
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_PASS)):
         with writer_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
@@ -210,7 +228,11 @@ def test_writer_validator_passes_when_score_9():
 
 
 def test_writer_validator_saves_last_output_when_score_low():
-    from workflows.agents import _writer_qs, writer_agent, quality_gate_agent
+    from resume_tailorator.workflows.agents import (
+        _writer_qs,
+        writer_agent,
+        quality_gate_agent,
+    )
 
     with quality_gate_agent.override(model=TestModel(custom_output_args=QC_FAIL)):
         with writer_agent.override(model=TestModel(custom_output_args=SAMPLE_CV)):
@@ -228,7 +250,11 @@ def test_writer_validator_saves_last_output_when_score_low():
 
 def test_workflow_fallback_uses_saved_output_when_parser_retries_exhausted(caplog):
     """Verify workflow saves output when quality gate retries trigger ModelRetry."""
-    from workflows.agents import _parser_qs, quality_gate_agent, resume_parser_agent
+    from resume_tailorator.workflows.agents import (
+        _parser_qs,
+        quality_gate_agent,
+        resume_parser_agent,
+    )
     from pydantic_ai.exceptions import UnexpectedModelBehavior
 
     # Ensure clean state before test
@@ -259,7 +285,11 @@ def test_workflow_fallback_uses_saved_output_when_parser_retries_exhausted(caplo
 
 def test_workflow_fallback_logs_warning_when_using_saved_output():
     """Verify quality gate validator saves last_output before exhausting retries."""
-    from workflows.agents import _parser_qs, quality_gate_agent, resume_parser_agent
+    from resume_tailorator.workflows.agents import (
+        _parser_qs,
+        quality_gate_agent,
+        resume_parser_agent,
+    )
     from pydantic_ai.exceptions import UnexpectedModelBehavior
 
     # Ensure clean state before test
@@ -286,7 +316,12 @@ def test_workflow_fallback_logs_warning_when_using_saved_output():
 
 def test_quality_state_singletons_importable():
     """Verify _QualityState singletons are importable from workflows.agents."""
-    from workflows.agents import _analyst_qs, _auditor_qs, _parser_qs, _writer_qs
+    from resume_tailorator.workflows.agents import (
+        _analyst_qs,
+        _auditor_qs,
+        _parser_qs,
+        _writer_qs,
+    )
 
     for qs in (_parser_qs, _analyst_qs, _writer_qs, _auditor_qs):
         assert hasattr(qs, "last_output")
@@ -295,9 +330,9 @@ def test_quality_state_singletons_importable():
 
 def test_quality_state_accepts_cv_assignment():
     """Verify _QualityState can store and retrieve CV objects."""
-    from workflows.agents import _parser_qs
+    from resume_tailorator.workflows.agents import _parser_qs
 
-    from models.agents.output import CV, WorkExperience
+    from resume_tailorator.models.agents.output import CV, WorkExperience
 
     cv = CV(
         full_name="Test User",

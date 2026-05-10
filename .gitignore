@@ -193,7 +193,10 @@ output/
 .worktrees/
 .claude/worktrees/
 
-# Resume memory SQLite database
-memory/
+# Resume memory SQLite database (runtime data, not source)
+/memory/
 *.sqlite3
 *.sqlite3-journal
+/coverage.json
+pytest-coverage.txt
+pytest.xml

@@ -30,8 +30,10 @@ packages = ["resume_tailorator"]
 [dependency-groups]
 dev = [
     "anyio>=4.11.0",
+    "commitizen>=4.15.1",
     "pytest>=8.0.0",
     "pytest-anyio>=0.0.0",
+    "pytest-cov>=7.1.0",
     "pytest-subtests>=0.13.0",
     "ruff>=0.14.6",
 ]
@@ -39,3 +41,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+bump_message = "chore(release): bump version $current_version -> $new_version"
+version_files = ["pyproject.toml:version"]
+update_changelog_on_bump = true
+

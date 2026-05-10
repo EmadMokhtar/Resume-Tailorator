@@ -1,4 +1,5 @@
 """Tests for deterministic resume parsing via pre-parsed CV cache."""
+
 import inspect
 import pytest
 
@@ -44,28 +45,31 @@ def test_pre_parsed_cv_preserves_skills(sample_pre_parsed_cv):
     assert len(sample_pre_parsed_cv.experience) == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_tailor_impl_accepts_debug_param():
     """_tailor_impl signature includes debug param."""
     from resume_tailorator.main import _tailor_impl
+
     sig = inspect.signature(_tailor_impl)
     assert "debug" in sig.parameters
     assert sig.parameters["debug"].default is False
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_re_tailor_impl_accepts_debug_param():
     """_re_tailor_impl signature includes debug param."""
     from resume_tailorator.main import _re_tailor_impl
+
     sig = inspect.signature(_re_tailor_impl)
     assert "debug" in sig.parameters
     assert sig.parameters["debug"].default is False
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_run_workflow_signature_includes_new_params():
     """_run_workflow passes pre_parsed_cv and debug through."""
     from resume_tailorator.main import _run_workflow
+
     sig = inspect.signature(_run_workflow)
     assert "pre_parsed_cv" in sig.parameters
     assert "debug" in sig.parameters

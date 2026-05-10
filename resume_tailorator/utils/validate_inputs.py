@@ -68,10 +68,7 @@ def main():
         type=str,
         default=None,
         metavar="URL",
-        help=(
-            "URL of the job posting to scrape. "
-            "Must start with http:// or https://."
-        ),
+        help=("URL of the job posting to scrape. Must start with http:// or https://."),
     )
     args = parser.parse_args()
 

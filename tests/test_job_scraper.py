@@ -18,23 +18,21 @@ from resume_tailorator.models.agents.output import ScrapedJobPosting
 from resume_tailorator.tools.job_scraper_helpers import (
     detect_placeholder_content,
     clean_job_posting_markdown,
-    parse_html_with_markitdown,
-    parse_html_with_html2text,
 )
 
-# Check if playwright is available for agent tests
-try:
-    import playwright
-    HAS_PLAYWRIGHT = True
-except ImportError:
-    HAS_PLAYWRIGHT = False
+from importlib.util import find_spec
+
+HAS_PLAYWRIGHT = find_spec("playwright") is not None
 
 # Ensure model requests are blocked (test mode only)
 models.ALLOW_MODEL_REQUESTS = False
 
 # Import agent and tools only if playwright is available
 if HAS_PLAYWRIGHT:
-    from resume_tailorator.workflows.agents import job_scraper_agent, validate_extraction
+    from resume_tailorator.workflows.agents import (
+        job_scraper_agent,
+        validate_extraction,
+    )
 else:
     # Define dummy validate_extraction for non-agent tests
     def validate_extraction(raw_html: str, extracted_markdown: str) -> dict:
@@ -152,15 +150,18 @@ class TestJobScraperAgent:
         # Override with TestModel for deterministic output
         with job_scraper_agent.override(
             model=TestModel(
+                call_tools=[],
                 custom_output_args=ScrapedJobPosting(
                     url="https://example.com/job/123",
                     markdown=REALISTIC_EXTRACTED_MARKDOWN,
                     source_text="raw html content",
                     extraction_strategy="html2text",
-                )
+                ),
             )
         ):
-            result = job_scraper_agent.run_sync("Scrape this job: https://example.com/job/123")
+            result = job_scraper_agent.run_sync(
+                "Scrape this job: https://example.com/job/123"
+            )
 
             assert isinstance(result.output, ScrapedJobPosting)
             assert result.output.url == "https://example.com/job/123"
@@ -172,12 +173,13 @@ class TestJobScraperAgent:
         """Test that scraped markdown content is substantial."""
         with job_scraper_agent.override(
             model=TestModel(
+                call_tools=[],
                 custom_output_args=ScrapedJobPosting(
                     url="https://example.com/job/456",
                     markdown=REALISTIC_EXTRACTED_MARKDOWN,
                     source_text="<html>...</html>",
                     extraction_strategy="markitdown",
-                )
+                ),
             )
         ):
             result = job_scraper_agent.run_sync("Scrape: https://example.com/job/456")
@@ -190,12 +192,13 @@ class TestJobScraperAgent:
         test_url = "https://jobs.github.com/123"
         with job_scraper_agent.override(
             model=TestModel(
+                call_tools=[],
                 custom_output_args=ScrapedJobPosting(
                     url=test_url,
                     markdown="Job content here" * 20,
                     source_text="<html>content</html>",
                     extraction_strategy="html2text",
-                )
+                ),
             )
         ):
             result = job_scraper_agent.run_sync(f"Scrape: {test_url}")
@@ -209,17 +212,16 @@ class TestJobScraperAgent:
         for strategy in strategies:
             with job_scraper_agent.override(
                 model=TestModel(
+                    call_tools=[],
                     custom_output_args=ScrapedJobPosting(
                         url="https://example.com/job",
                         markdown=REALISTIC_EXTRACTED_MARKDOWN,
                         source_text="<html>...</html>",
                         extraction_strategy=strategy,
-                    )
+                    ),
                 )
             ):
-                result = job_scraper_agent.run_sync(
-                    "Scrape: https://example.com/job"
-                )
+                result = job_scraper_agent.run_sync("Scrape: https://example.com/job")
 
                 assert result.output.extraction_strategy == strategy
 
@@ -448,7 +450,7 @@ class TestExtractionQualityScoring:
         """Test that quality score considers total length including whitespace."""
         # Content with significant whitespace
         markdown_with_spaces = "word " * 200  # 1000 chars with spaces
-        markdown_no_spaces = "word" * 200    # 800 chars no spaces
+        markdown_no_spaces = "word" * 200  # 800 chars no spaces
 
         result_spaces = validate_extraction(
             raw_html="<html>html</html>",
@@ -484,7 +486,7 @@ class TestHelperFunctionsIntegration:
         """Test that HTML parsing integrates properly."""
         # Placeholder detection should work
         assert detect_placeholder_content("<script>error</script>" + " x" * 50) is True
-        
+
         # Cleaning should work
         dirty_markdown = "line1  \n\n\n\nline2\n"
         clean_markdown = clean_job_posting_markdown(dirty_markdown)
@@ -596,12 +598,15 @@ class TestPlaceholderDetectionInScraping:
 
     def test_real_posting_with_javascript_skills_not_placeholder(self):
         """Test that real job posting mentioning JavaScript is not flagged."""
-        content = """
+        content = (
+            """
         Senior Software Engineer
         Requirements: JavaScript, TypeScript, React
         We seek an expert in JavaScript frameworks.
         Must have 5+ years working with JavaScript.
-        """ + " x" * 50
+        """
+            + " x" * 50
+        )
         assert detect_placeholder_content(content) is False
 
     def test_minimum_valid_content_length(self):

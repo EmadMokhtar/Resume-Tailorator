@@ -23,7 +23,10 @@ from resume_tailorator.models.agents.output import (
     ScrapedJobPosting,
 )
 from resume_tailorator.models.workflow import ResumeTailorResult
-from resume_tailorator.utils.markdown_writer import generate_report_markdown, generate_resume
+from resume_tailorator.utils.markdown_writer import (
+    generate_report_markdown,
+    generate_resume,
+)
 from resume_tailorator.utils.resume_converter import (
     ConversionFailedError,
     InputConverterRegistry,
@@ -98,8 +101,7 @@ def _audit_result_from_dict(audit_dict: dict) -> AuditResult:
     ]
     return AuditResult(
         passed=audit_dict.get("passed", False),
-        hallucination_score=audit_dict.get("hallucination_score", 0)
-        or 0,
+        hallucination_score=audit_dict.get("hallucination_score", 0) or 0,
         ai_cliche_score=audit_dict.get("ai_cliche_score", 0) or 0,
         issues=issues,
         feedback_summary=audit_dict.get("feedback_summary", ""),
@@ -111,9 +113,13 @@ def _print_report_to_console(report: FinalReport) -> None:
     console.print("\n" + "=" * width)
     console.print(f"📊 SELF-REVIEW REPORT — {report.company_name} · {report.job_title}")
     console.print("=" * width)
-    console.print(f"🎯 Match Score: {report.match_score}/100 · {report.overall_recommendation}")
+    console.print(
+        f"🎯 Match Score: {report.match_score}/100 · {report.overall_recommendation}"
+    )
     console.print(f"📅 Generated: {report.generated_at}")
-    console.print(f"{'✅' if report.passed else '❌'} Audit: {'Passed' if report.passed else 'Failed'}")
+    console.print(
+        f"{'✅' if report.passed else '❌'} Audit: {'Passed' if report.passed else 'Failed'}"
+    )
 
     console.print("\nWHAT CHANGED")
     diff = report.what_changed
@@ -123,9 +129,13 @@ def _print_report_to_console(report: FinalReport) -> None:
         if diff.summary_changed:
             console.print("  ✏️  Summary rewritten")
         if diff.skills_reordered:
-            console.print(f"  🔼 Skills reordered to top: {', '.join(diff.skills_reordered)}")
+            console.print(
+                f"  🔼 Skills reordered to top: {', '.join(diff.skills_reordered)}"
+            )
         if diff.skills_deprioritized:
-            console.print(f"  🔽 Skills deprioritized: {', '.join(diff.skills_deprioritized)}")
+            console.print(
+                f"  🔽 Skills deprioritized: {', '.join(diff.skills_deprioritized)}"
+            )
         for exp_change in diff.experience_changes:
             console.print(
                 f"  📝 {exp_change.role} @ {exp_change.company}: "
@@ -179,9 +189,7 @@ async def _run_workflow(
 
     job_content = job_posting_markdown
     if recommendations:
-        job_content += (
-            f"\n\n---\n**Additional recommendations from prior audit:**\n{recommendations}\n"
-        )
+        job_content += f"\n\n---\n**Additional recommendations from prior audit:**\n{recommendations}\n"
 
     result = await workflow.run(
         resume_content,
@@ -441,7 +449,9 @@ def tailor(
     job_url: str = typer.Argument(..., help="URL of job posting to scrape"),
     resume_path: str = typer.Argument(..., help="Path to resume (Markdown, DOCX, PDF)"),
     output_dir: str = typer.Option("./output", help="Directory for output files"),
-    model: str | None = typer.Option(None, help="AI model to use (e.g., openai:gpt-4o-mini)"),
+    model: str | None = typer.Option(
+        None, help="AI model to use (e.g., openai:gpt-4o-mini)"
+    ),
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Stream agent thinking and prompts in real-time"
     ),
@@ -504,7 +514,9 @@ async def _re_tailor_impl(
     if resume_path:
         _resume_source_path = os.path.expanduser(resume_path)
         if not os.path.exists(_resume_source_path):
-            console.print(f"[red]❌ Resume file not found at {_resume_source_path}[/red]")
+            console.print(
+                f"[red]❌ Resume file not found at {_resume_source_path}[/red]"
+            )
             raise typer.Exit(code=1)
         resolved = await service.aresolve_original_resume(path=_resume_source_path)
     else:
@@ -523,14 +535,18 @@ async def _re_tailor_impl(
             )
             raise typer.Exit(code=1)
         else:
-            console.print("[red]❌ No original resume source recorded for this job[/red]")
+            console.print(
+                "[red]❌ No original resume source recorded for this job[/red]"
+            )
             console.print(
                 "[yellow]💡 Tip: Re-run with --resume-path to provide the resume file.[/yellow]"
             )
             raise typer.Exit(code=1)
 
     # Read actual file content as text — never round-trip through parsed CV JSON.
-    ext = os.path.splitext(_resume_source_path)[1].lower() if _resume_source_path else ""
+    ext = (
+        os.path.splitext(_resume_source_path)[1].lower() if _resume_source_path else ""
+    )
     if ext in (".docx", ".pdf"):
         try:
             registry = InputConverterRegistry()
@@ -612,8 +628,12 @@ async def _re_tailor_impl(
 @app.command()
 def re_tailor(
     job_id: str = typer.Argument(..., help="UUID of prior job"),
-    recommendations: str = typer.Argument(..., help="Comments/recommendations from prior audit"),
-    resume_path: str | None = typer.Option(None, help="Path to resume (uses stored path if omitted)"),
+    recommendations: str = typer.Argument(
+        ..., help="Comments/recommendations from prior audit"
+    ),
+    resume_path: str | None = typer.Option(
+        None, help="Path to resume (uses stored path if omitted)"
+    ),
     output_dir: str = typer.Option("./output", help="Directory for output files"),
     model: str | None = typer.Option(None, help="AI model to use"),
     verbose: bool = typer.Option(

@@ -115,7 +115,7 @@ class PdfOutputConverter:
 
     def convert(self, content: str, output_path: Path) -> None:
         try:
-            from utils.pdf_converter import markdown_to_pdf
+            from resume_tailorator.utils.pdf_converter import markdown_to_pdf
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             markdown_to_pdf(content, str(output_path))

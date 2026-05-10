@@ -14,6 +14,8 @@ from resume_tailorator.utils.resume_converter import (
     UnsupportedFormatError,
     UnsupportedOutputFormatError,
     auto_detect_resume,
+    _is_section_header,
+    _normalize_markdown_headings,
 )
 
 
@@ -197,11 +199,6 @@ class TestAutoDetectResume:
 # Heading normalization
 # ---------------------------------------------------------------------------
 
-from resume_tailorator.utils.resume_converter import (
-    _is_section_header,
-    _normalize_markdown_headings,
-)
-
 
 class TestIsSectionHeader:
     def test_all_caps_is_header(self):
@@ -235,7 +232,10 @@ class TestIsSectionHeader:
         assert _is_section_header("2020-2024") is False
 
     def test_contact_line_not_header(self):
-        assert _is_section_header("+31 (6) 45955236 | me@emadmokhtar.com | Rotterdam") is False
+        assert (
+            _is_section_header("+31 (6) 45955236 | me@emadmokhtar.com | Rotterdam")
+            is False
+        )
 
     def test_single_char_not_header(self):
         assert _is_section_header("A") is False

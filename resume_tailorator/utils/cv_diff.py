@@ -5,7 +5,13 @@ No LLM calls. All comparisons are done on Pydantic model fields directly.
 
 from __future__ import annotations
 
-from resume_tailorator.models.agents.output import CV, CVDiff, ExperienceChange, GapAnalysis, JobAnalysis
+from resume_tailorator.models.agents.output import (
+    CV,
+    CVDiff,
+    ExperienceChange,
+    GapAnalysis,
+    JobAnalysis,
+)
 
 
 def compute_cv_diff(original: CV, tailored: CV) -> CVDiff:

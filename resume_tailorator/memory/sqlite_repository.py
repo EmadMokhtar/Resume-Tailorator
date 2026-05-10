@@ -218,6 +218,11 @@ class SQLiteResumeMemoryRepository(ResumeMemoryRepository):
         """Close the underlying SQLite connection."""
         self._conn.close()
 
+    def __del__(self) -> None:
+        conn = getattr(self, "_conn", None)
+        if conn is not None:
+            conn.close()
+
     def __enter__(self) -> "SQLiteResumeMemoryRepository":
         return self
 

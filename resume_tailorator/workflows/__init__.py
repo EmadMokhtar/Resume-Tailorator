@@ -77,7 +77,9 @@ class ResumeTailorWorkflow:
             status = self._stage_status[stage]
             icon = icons.get(status, "?")
             label = labels.get(stage, stage)
-            current_marker = "→" if (stage == self._current_stage and status == "running") else " "
+            current_marker = (
+                "→" if (stage == self._current_stage and status == "running") else " "
+            )
             print(f"  {current_marker}{icon} {label}: {status.upper()}")
         print("=" * 50 + "\n")
 
@@ -124,8 +126,10 @@ class ResumeTailorWorkflow:
             print("♻️  Using cached parsed resume (skipping AI parsing)")
             original_cv = pre_parsed_cv
             if debug:
-                print(f"   [Debug] Pre-parsed CV has {len(original_cv.skills)} skills, "
-                      f"{len(original_cv.experience)} work experiences")
+                print(
+                    f"   [Debug] Pre-parsed CV has {len(original_cv.skills)} skills, "
+                    f"{len(original_cv.experience)} work experiences"
+                )
         else:
             print("🤖 Agent 0 (Parser): Parsing original resume...")
             for attempt in range(self.MAX_RETRIES):

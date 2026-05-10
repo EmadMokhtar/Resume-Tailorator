@@ -79,11 +79,7 @@ def _normalize_markdown_headings(markdown: str) -> str:
     for i, line in enumerate(lines):
         stripped = line.strip()
         prev_blank = i == 0 or not lines[i - 1].strip()
-        if (
-            prev_blank
-            and _is_section_header(stripped)
-            and not stripped.startswith("#")
-        ):
+        if prev_blank and _is_section_header(stripped) and not stripped.startswith("#"):
             result.append(f"## {stripped}")
         else:
             result.append(line)
