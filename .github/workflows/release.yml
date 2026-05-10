@@ -39,11 +39,13 @@ jobs:
         run: awk '/^## /{if(++c>1)exit} {print}' CHANGELOG.md > body.md
 
       - name: Push to release branch and create PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
-          git add pyproject.toml CHANGELOG.md
+          git add pyproject.toml CHANGELOG.md uv.lock
           git commit -m "chore(release): bump version $NEW_VERSION"
           git push origin "$BRANCH" --force
           gh pr create \
