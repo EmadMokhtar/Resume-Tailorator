@@ -35,8 +35,8 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "BRANCH=release/v$NEW_VERSION" >> $GITHUB_ENV
 
-      - name: Generate changelog body
-        run: uv run cz changelog --dry-run "$NEW_VERSION" > body.md
+      - name: Extract changelog body
+        run: awk '/^## /{if(++c>1)exit} {print}' CHANGELOG.md > body.md
 
       - name: Push to release branch and create PR
         run: |
@@ -81,8 +81,8 @@ jobs:
           git tag "v$VERSION"
           git push origin "v$VERSION"
 
-      - name: Generate changelog for release
-        run: uv run cz changelog --dry-run "$VERSION" > body.md
+      - name: Extract changelog for release
+        run: awk '/^## /{if(++c>1)exit} {print}' CHANGELOG.md > body.md
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
