@@ -152,6 +152,7 @@ class TestJobScraperAgent:
         # Override with TestModel for deterministic output
         with job_scraper_agent.override(
             model=TestModel(
+                call_tools=[],
                 custom_output_args=ScrapedJobPosting(
                     url="https://example.com/job/123",
                     markdown=REALISTIC_EXTRACTED_MARKDOWN,
@@ -172,6 +173,7 @@ class TestJobScraperAgent:
         """Test that scraped markdown content is substantial."""
         with job_scraper_agent.override(
             model=TestModel(
+                call_tools=[],
                 custom_output_args=ScrapedJobPosting(
                     url="https://example.com/job/456",
                     markdown=REALISTIC_EXTRACTED_MARKDOWN,
@@ -190,6 +192,7 @@ class TestJobScraperAgent:
         test_url = "https://jobs.github.com/123"
         with job_scraper_agent.override(
             model=TestModel(
+                call_tools=[],
                 custom_output_args=ScrapedJobPosting(
                     url=test_url,
                     markdown="Job content here" * 20,
@@ -209,6 +212,7 @@ class TestJobScraperAgent:
         for strategy in strategies:
             with job_scraper_agent.override(
                 model=TestModel(
+                    call_tools=[],
                     custom_output_args=ScrapedJobPosting(
                         url="https://example.com/job",
                         markdown=REALISTIC_EXTRACTED_MARKDOWN,

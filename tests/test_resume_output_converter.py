@@ -47,32 +47,32 @@ SAMPLE_MARKDOWN = "# Jane Smith\n\n## Professional Summary\nExperienced engineer
 
 class TestBuildResumeMarkdown:
     def test_returns_nonempty_string(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert isinstance(result, str)
         assert result.strip()
 
     def test_contains_full_name(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "Jane Smith" in result
 
     def test_contains_contact_info(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "jane@example.com" in result
 
     def test_contains_summary(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "Experienced Python engineer." in result
 
     def test_contains_skills(self, subtests):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         with subtests.test("Python"):
@@ -81,32 +81,32 @@ class TestBuildResumeMarkdown:
             assert "Django" in result
 
     def test_contains_work_experience(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "Senior Engineer" in result
         assert "Acme Corp" in result
 
     def test_contains_education(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "BSc CS" in result
 
     def test_contains_certifications(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "AWS Certified" in result
 
     def test_contains_publications(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         result = build_resume_markdown(SAMPLE_RESULT)
         assert "Python Patterns" in result
 
     def test_raises_output_conversion_failed_on_invalid_json(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         bad_result = ResumeTailorResult(
             company_name="Test",
@@ -119,7 +119,7 @@ class TestBuildResumeMarkdown:
             build_resume_markdown(bad_result)
 
     def test_handles_minimal_resume_fields(self):
-        from utils.resume_output_converter import build_resume_markdown
+        from resume_tailorator.utils.resume_output_converter import build_resume_markdown
 
         minimal_result = ResumeTailorResult(
             company_name="Test",

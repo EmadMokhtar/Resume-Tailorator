@@ -27,7 +27,7 @@ class _AsyncIter:
 class TestRunAgentNonVerbose:
     """When verbose=False, run_agent delegates directly to agent.run()."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_delegates_to_agent_run(self):
         agent = MagicMock(spec=Agent)
         expected = MagicMock()
@@ -38,7 +38,7 @@ class TestRunAgentNonVerbose:
         agent.run.assert_awaited_once()
         assert result is expected
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_passes_usage_params(self):
         agent = MagicMock(spec=Agent)
         agent.run = AsyncMock()
@@ -51,7 +51,7 @@ class TestRunAgentNonVerbose:
 class TestRunAgentVerbose:
     """When verbose=True, run_agent uses run_stream_events and prints to console."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_prints_steam_header(self):
         agent = MagicMock(spec=Agent)
         agent.run = AsyncMock()
@@ -73,7 +73,7 @@ class TestRunAgentVerbose:
             "test prompt", usage=None, usage_limits=None
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_falls_back_on_stream_error(self):
         agent = MagicMock(spec=Agent)
         fallback_result = MagicMock()

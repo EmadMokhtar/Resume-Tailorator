@@ -14,7 +14,7 @@ pytestmark = pytest.mark.anyio
 
 async def test_report_agent_returns_final_report() -> None:
     """report_agent should return a FinalReport when given valid JSON context."""
-    from workflows.agents import report_agent  # noqa: PLC0415 — avoids import-time LLM init
+    from resume_tailorator.workflows.agents import report_agent  # noqa: PLC0415 — avoids import-time LLM init
 
     custom = {
         "job_title": "Senior Backend Engineer",
@@ -40,7 +40,7 @@ async def test_report_agent_returns_final_report() -> None:
 
 async def test_report_agent_output_has_required_fields(subtests: SubTests) -> None:
     """FinalReport output must contain all expected fields."""
-    from workflows.agents import report_agent  # noqa: PLC0415 — avoids import-time LLM init
+    from resume_tailorator.workflows.agents import report_agent  # noqa: PLC0415 — avoids import-time LLM init
 
     custom = {
         "job_title": "Senior Backend Engineer",

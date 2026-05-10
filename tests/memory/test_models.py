@@ -51,7 +51,7 @@ def test_missing_original_resume_error_has_clear_message() -> None:
 
 
 def test_resume_memory_error_is_exported() -> None:
-    import memory
+    import resume_tailorator.memory as memory
 
     assert hasattr(memory, "ResumeMemoryError")
     assert "ResumeMemoryError" in getattr(memory, "__all__", [])

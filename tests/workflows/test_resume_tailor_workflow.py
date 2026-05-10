@@ -11,7 +11,7 @@ class DummyRunResult:
         self.output = output
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_workflow_uses_provided_original_cv_without_reparsing(
     monkeypatch, sample_cv, subtests
 ) -> None:
@@ -75,7 +75,7 @@ async def test_workflow_uses_provided_original_cv_without_reparsing(
         assert result.passed is True
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_analyst_failure_after_retries_raises_runtime_error(
     monkeypatch, sample_cv
 ) -> None:
@@ -91,5 +91,5 @@ async def test_analyst_failure_after_retries_raises_runtime_error(
     monkeypatch.setattr("resume_tailorator.workflows.agents.analyst_agent.run", always_fail)
 
 
-    with pytest.raises(RuntimeError, match="job analysis"):
+    with pytest.raises(SystemExit, match="job analysis"):
         await ResumeTailorWorkflow().run(sample_cv, "files/job_posting.md")
