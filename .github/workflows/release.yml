@@ -10,12 +10,13 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Install uv
@@ -27,7 +28,16 @@ jobs:
         run: uv sync --dev
 
       - name: Bump version and update changelog
-        uses: commitizen-tools/commitizen-action@v4.4.0
+        uses: commitizen-tools/commitizen-action@0.27.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          push: true
+          changelog_increment_filename: body.md
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v${{ env.REVISION }}
+          bodyFile: "body.md"
+          skipIfReleaseExists: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
