@@ -8,6 +8,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -29,27 +31,10 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Run tests with coverage
-        run: uv run pytest --cov=resume_tailorator --cov-report=term-missing --cov-report=json
+        run: uv run pytest --junitxml=pytest.xml --cov=resume_tailorator --cov-report=term-missing | tee pytest-coverage.txt
 
-      - name: Coverage report
-        run: |
-          uv run python -c "
-          import json, os
-          data = json.load(open('coverage.json'))
-          totals = data['totals']
-          pct = totals['percent_covered']
-          emoji = '\U0001f7e2' if pct >= 80 else ('\U0001f7e1' if pct >= 60 else '\U0001f534')
-          lines = [f'## {emoji} Coverage: {pct:.1f}%']
-          lines.append('')
-          lines.append('| | Stmts | Miss | Cover |')
-          lines.append('| --- | ---: | ---: | ---: |')
-          for path, fdata in sorted(data['files'].items()):
-              fp = fdata['summary']
-              if fp['num_statements'] == 0:
-                  continue
-              name = path.replace('resume_tailorator/', '')
-              cp = fp['percent_covered']
-              lines.append(f'| {name} | {fp[\"num_statements\"]} | {fp[\"missing_lines\"]} | {cp:.0f}% |')
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-              f.write('\n'.join(lines))
-          "
+      - name: Pytest coverage comment
+        uses: MishaKav/pytest-coverage-comment@v1
+        with:
+          pytest-coverage-path: ./pytest-coverage.txt
+          junitxml-path: ./pytest.xml
