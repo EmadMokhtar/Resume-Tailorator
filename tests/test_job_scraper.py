@@ -18,16 +18,10 @@ from resume_tailorator.models.agents.output import ScrapedJobPosting
 from resume_tailorator.tools.job_scraper_helpers import (
     detect_placeholder_content,
     clean_job_posting_markdown,
-    parse_html_with_markitdown,
-    parse_html_with_html2text,
 )
 
-# Check if playwright is available for agent tests
-try:
-    import playwright
-    HAS_PLAYWRIGHT = True
-except ImportError:
-    HAS_PLAYWRIGHT = False
+from importlib.util import find_spec
+HAS_PLAYWRIGHT = find_spec("playwright") is not None
 
 # Ensure model requests are blocked (test mode only)
 models.ALLOW_MODEL_REQUESTS = False

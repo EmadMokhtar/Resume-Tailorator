@@ -23,7 +23,6 @@ Coverage:
    - Scraper timeout handled gracefully
 """
 
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path

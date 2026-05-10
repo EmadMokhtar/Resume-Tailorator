@@ -103,13 +103,12 @@ def test_tailor_command_success(tmp_path, monkeypatch) -> None:
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls,
-        patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+        patch("resume_tailorator.main.PydanticAIResumeParser") as _,
         patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
     ):
         mock_repo = MagicMock()
         mock_repo_cls.return_value = mock_repo
-        mock_parser = MagicMock()
-        mock_parser_cls.return_value = mock_parser
+        # mock_parser is no longer used since mock_parser_cls is now _
         mock_svc = MagicMock()
         mock_svc.resolve_original_resume.return_value = MagicMock(
             source=MagicMock(id="src-123"),
@@ -240,13 +239,12 @@ def test_tailor_command_failed_audit_exits_zero(tmp_path, monkeypatch) -> None:
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls,
-        patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+        patch("resume_tailorator.main.PydanticAIResumeParser") as _,
         patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
     ):
         mock_repo = MagicMock()
         mock_repo_cls.return_value = mock_repo
-        mock_parser = MagicMock()
-        mock_parser_cls.return_value = mock_parser
+        # mock_parser is no longer used since mock_parser_cls is now _
         mock_svc = MagicMock()
         mock_svc.resolve_original_resume.return_value = MagicMock(
             source=MagicMock(id="src-123"),
@@ -340,13 +338,12 @@ def test_tailor_command_docx_conversion(tmp_path, monkeypatch) -> None:
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls,
-        patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+        patch("resume_tailorator.main.PydanticAIResumeParser") as _,
         patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
     ):
         mock_repo = MagicMock()
         mock_repo_cls.return_value = mock_repo
-        mock_parser = MagicMock()
-        mock_parser_cls.return_value = mock_parser
+        # mock_parser is no longer used since mock_parser_cls is now _
         mock_svc = MagicMock()
         mock_svc.resolve_original_resume.return_value = MagicMock(
             source=MagicMock(id="src-123"),
@@ -398,7 +395,7 @@ def test_re_tailor_success(tmp_path, monkeypatch) -> None:
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls,
-        patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+        patch("resume_tailorator.main.PydanticAIResumeParser") as _,
         patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
     ):
         mock_repo = MagicMock()
@@ -412,9 +409,7 @@ def test_re_tailor_success(tmp_path, monkeypatch) -> None:
         mock_repo.get_source_by_id.return_value = MagicMock(path=str(resume_file))
         mock_repo_cls.return_value = mock_repo
 
-        mock_parser = MagicMock()
-        mock_parser_cls.return_value = mock_parser
-
+        # mock_parser is no longer used since mock_parser_cls is now _
         mock_svc = MagicMock()
         mock_svc.resolve_original_resume.return_value = MagicMock(
             source=MagicMock(id="src-123", path=str(resume_file)),
@@ -490,7 +485,7 @@ def test_re_tailor_no_job_markdown(tmp_path, monkeypatch) -> None:
         mock_repo_cls.return_value = mock_repo
 
         with (
-            patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+            patch("resume_tailorator.main.PydanticAIResumeParser") as _,
             patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
         ):
             mock_svc = MagicMock()
@@ -537,7 +532,7 @@ def test_re_tailor_with_resume_path(tmp_path, monkeypatch) -> None:
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls,
-        patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+        patch("resume_tailorator.main.PydanticAIResumeParser") as _,
         patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
     ):
         mock_repo = MagicMock()
@@ -683,13 +678,12 @@ def test_tailor_command_custom_patterns(tmp_path, monkeypatch) -> None:
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls,
-        patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+        patch("resume_tailorator.main.PydanticAIResumeParser") as _,
         patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
     ):
         mock_repo = MagicMock()
         mock_repo_cls.return_value = mock_repo
-        mock_parser = MagicMock()
-        mock_parser_cls.return_value = mock_parser
+        # mock_parser is no longer used since mock_parser_cls is now _
         mock_svc = MagicMock()
         mock_svc.resolve_original_resume.return_value = MagicMock(
             source=MagicMock(id="src-123"),
@@ -752,7 +746,7 @@ def test_re_tailor_custom_patterns(tmp_path, monkeypatch) -> None:
         patch("resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow),
         patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch("resume_tailorator.main.SQLiteResumeMemoryRepository") as mock_repo_cls,
-        patch("resume_tailorator.main.PydanticAIResumeParser") as mock_parser_cls,
+        patch("resume_tailorator.main.PydanticAIResumeParser") as _,
         patch("resume_tailorator.main.ResumeMemoryService") as mock_svc_cls,
     ):
         mock_repo = MagicMock()
@@ -766,9 +760,7 @@ def test_re_tailor_custom_patterns(tmp_path, monkeypatch) -> None:
         mock_repo.get_source_by_id.return_value = MagicMock(path=str(resume_file))
         mock_repo_cls.return_value = mock_repo
 
-        mock_parser = MagicMock()
-        mock_parser_cls.return_value = mock_parser
-
+        # mock_parser is no longer used since mock_parser_cls is now _
         mock_svc = MagicMock()
         mock_svc.resolve_original_resume.return_value = MagicMock(
             source=MagicMock(id="src-123", path=str(resume_file)),

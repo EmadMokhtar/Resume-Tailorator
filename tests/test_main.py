@@ -16,8 +16,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.anyio
-
 from resume_tailorator import main as main_module
 from resume_tailorator.memory.models import (
     MissingOriginalResumeError,
@@ -27,6 +25,8 @@ from resume_tailorator.memory.models import (
 )
 from resume_tailorator.models.agents.output import CV, WorkExperience
 from resume_tailorator.models.workflow import ResumeTailorResult
+
+pytestmark = pytest.mark.anyio
 
 
 # ---------------------------------------------------------------------------

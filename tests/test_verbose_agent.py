@@ -63,7 +63,7 @@ class TestRunAgentVerbose:
         )
 
         with patch("resume_tailorator.workflows.agents._console") as mock_console:
-            result = await run_agent(
+            _ = await run_agent(
                 agent, "test prompt", verbose=True, agent_label="TestAgent"
             )
 

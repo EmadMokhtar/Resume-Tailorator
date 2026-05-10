@@ -14,6 +14,8 @@ from resume_tailorator.utils.resume_converter import (
     UnsupportedFormatError,
     UnsupportedOutputFormatError,
     auto_detect_resume,
+    _is_section_header,
+    _normalize_markdown_headings,
 )
 
 
@@ -197,10 +199,6 @@ class TestAutoDetectResume:
 # Heading normalization
 # ---------------------------------------------------------------------------
 
-from resume_tailorator.utils.resume_converter import (
-    _is_section_header,
-    _normalize_markdown_headings,
-)
 
 
 class TestIsSectionHeader:

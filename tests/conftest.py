@@ -71,7 +71,7 @@ def sample_pdf(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def sample_cv():
+def sample_cv(tmp_path: Path):
     from resume_tailorator.models.agents.output import CV, WorkExperience
     return CV(
         full_name="Jane Smith",
