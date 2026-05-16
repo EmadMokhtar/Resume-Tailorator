@@ -49,9 +49,7 @@ def _setup_mocks(
     elif scraper_output is not None:
         mock_scraper_run = AsyncMock(return_value=scraper_output)
     else:
-        mock_scraper_run = AsyncMock(
-            return_value=MagicMock(output=make_scraped_job())
-        )
+        mock_scraper_run = AsyncMock(return_value=MagicMock(output=make_scraped_job()))
 
     mock_svc = MagicMock()
     resolved = MagicMock()
@@ -62,9 +60,7 @@ def _setup_mocks(
     if save_side_effect is not None:
         mock_svc.save_tailored_resume = MagicMock(side_effect=save_side_effect)
     else:
-        mock_svc.save_tailored_resume = MagicMock(
-            return_value=MagicMock(id="job-456")
-        )
+        mock_svc.save_tailored_resume = MagicMock(return_value=MagicMock(id="job-456"))
 
     mocks = {
         "workflow": mock_workflow,
@@ -191,9 +187,7 @@ async def test_scraper_network_error_handled(tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.anyio
-async def test_scraper_content_flows_to_workflow(
-    tmp_path, monkeypatch
-) -> None:
+async def test_scraper_content_flows_to_workflow(tmp_path, monkeypatch) -> None:
     """Scraped job content is correctly forwarded to the workflow."""
     resume_file = tmp_path / "resume.md"
     resume_file.write_text("# Jane Doe\nPython developer.")
@@ -227,9 +221,7 @@ async def test_scraper_content_flows_to_workflow(
 
 
 @pytest.mark.anyio
-async def test_scraper_unexpected_output_type_handled(
-    tmp_path, monkeypatch
-) -> None:
+async def test_scraper_unexpected_output_type_handled(tmp_path, monkeypatch) -> None:
     """Exit when scraper returns non-ScrapedJobPosting output."""
     resume_file = tmp_path / "resume.md"
     resume_file.write_text("# Jane Doe\nPython developer.")

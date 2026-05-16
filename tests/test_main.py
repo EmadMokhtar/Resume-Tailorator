@@ -56,18 +56,14 @@ def _setup_mocks(
     resolved.cv = cv
 
     if resolve_side_effect is not None:
-        mock_svc.aresolve_original_resume = AsyncMock(
-            side_effect=resolve_side_effect
-        )
+        mock_svc.aresolve_original_resume = AsyncMock(side_effect=resolve_side_effect)
     else:
         mock_svc.aresolve_original_resume = AsyncMock(return_value=resolved)
 
     if save_side_effect is not None:
         mock_svc.save_tailored_resume = MagicMock(side_effect=save_side_effect)
     else:
-        mock_svc.save_tailored_resume = MagicMock(
-            return_value=MagicMock(id="job-456")
-        )
+        mock_svc.save_tailored_resume = MagicMock(return_value=MagicMock(id="job-456"))
 
     mocks = {
         "workflow": mock_workflow,
@@ -144,9 +140,7 @@ async def test_tailor_impl_persists_result_on_success(
 
 
 @pytest.mark.anyio
-async def test_tailor_impl_failed_audit_persists_record(
-    tmp_path, monkeypatch
-) -> None:
+async def test_tailor_impl_failed_audit_persists_record(tmp_path, monkeypatch) -> None:
     """Save record even when audit fails (for re-tailoring), but skip resume file."""
     resume_file = tmp_path / "resume.md"
     resume_file.write_text("# Jane Doe\nPython developer.")
@@ -248,9 +242,7 @@ async def test_tailor_impl_cache_miss_falls_back_to_ai_parsing(
 
     monkeypatch.chdir(tmp_path)
 
-    patches, mocks = _setup_mocks(
-        resolve_side_effect=Exception("DB connection lost")
-    )
+    patches, mocks = _setup_mocks(resolve_side_effect=Exception("DB connection lost"))
 
     from resume_tailorator.main import _tailor_impl
 
@@ -290,9 +282,7 @@ async def test_tailor_impl_invalid_url_exits(tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.anyio
-async def test_tailor_impl_empty_resume_content_exits(
-    tmp_path, monkeypatch
-) -> None:
+async def test_tailor_impl_empty_resume_content_exits(tmp_path, monkeypatch) -> None:
     """Reject empty resume content with TyperExit."""
     resume_file = tmp_path / "resume.md"
     resume_file.write_text("")
