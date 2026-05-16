@@ -1,3 +1,9 @@
+## v0.2.2 (2026-05-16)
+
+### Fix
+
+- rewrite 18 skipped tests for Typer/_tailor_impl architecture (#27)
+
 ## v0.2.1 (2026-05-16)
 
 ### Fix
