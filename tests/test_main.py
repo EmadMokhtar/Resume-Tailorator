@@ -1,414 +1,313 @@
-"""Tests for Task 6 CLI integration: main.py wired to memory service.
+"""Tests for _tailor_impl memory service integration and error handling.
 
 Coverage:
-- Explicit --resume-path argument → service resolves from that path, workflow
-  runs against the resolved CV, tailored resume is persisted.
-- No --resume-path argument → service.resolve_original_resume called with
-  path=None (latest-stored fallback handled inside service).
-- First run with no stored resume → MissingOriginalResumeError → user-facing
-  message printed and sys.exit(1) raised (no raw traceback).
-- FileNotFoundError from service → user-facing message and sys.exit(1).
-- Workflow result.passed=False → tailored resume NOT saved.
+- Successful workflow run → result persisted via memory service
+- Failed audit → record still persisted (for re-tailoring), resume file NOT generated
+- Save failure → graceful handling (warning, not crash)
+- Cache hit: pre-parsed CV reused when available
+- Cache miss / error → falls back to AI parsing
+- Invalid URL rejected early
 """
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from typer import Exit as TyperExit
 
-from resume_tailorator import main as main_module
-from resume_tailorator.memory.models import (
-    MissingOriginalResumeError,
-    ResolvedOriginalResume,
-    ResumeMemoryError,
-    ResumeSourceRecord,
-)
-from resume_tailorator.models.agents.output import CV, WorkExperience
-from resume_tailorator.models.workflow import ResumeTailorResult
+from tests.factories import make_cv, make_result, make_scraped_job
 
 pytestmark = pytest.mark.anyio
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Mock setup
 # ---------------------------------------------------------------------------
 
 
-def _make_cv(full_name: str = "Jane Doe") -> CV:
-    return CV(
-        full_name=full_name,
-        contact_info="jane@example.com",
-        summary="Platform engineer.",
-        skills=["Python", "SQL"],
-        experience=[
-            WorkExperience(
-                company="Acme",
-                role="Engineer",
-                dates="2022-2026",
-                highlights=["Built services"],
-            )
-        ],
-        education=["BSc CS"],
-    )
-
-
-def _make_source_record(path: str = "/fake/resume.md") -> ResumeSourceRecord:
-    now = datetime.now(timezone.utc)
-    return ResumeSourceRecord(
-        id="source-abc-123",
-        path=path,
-        content_hash="deadbeef",
-        is_active=True,
-        created_at=now,
-        updated_at=now,
-        last_seen_at=now,
-    )
-
-
-def _make_resolved(
-    cv: CV | None = None, path: str = "/fake/resume.md"
-) -> ResolvedOriginalResume:
-    cv = cv or _make_cv()
-    return ResolvedOriginalResume(source=_make_source_record(path=path), cv=cv)
-
-
-def _make_result(cv: CV | None = None, passed: bool = True) -> ResumeTailorResult:
-    cv = cv or _make_cv()
-    return ResumeTailorResult(
-        company_name="Acme Corp",
-        job_title="Software Engineer",
-        tailored_resume=cv.model_dump_json(),
-        audit_report={
-            "passed": passed,
-            "hallucination_score": 0,
-            "ai_cliche_score": 1,
-            "issues": [],
-            "feedback_summary": "Looks good.",
-        },
-        passed=passed,
-    )
-
-
-def _patch_all(
+def _setup_mocks(
     *,
-    resolved: ResolvedOriginalResume,
-    workflow_result: ResumeTailorResult,
+    cv=None,
+    passed: bool = True,
     resolve_side_effect=None,
     save_side_effect=None,
+    scraper_side_effect=None,
 ):
-    """Return a context manager stack that patches all external collaborators.
-
-    Returns a dict of named mocks so tests can assert on them.
-    """
-    mock_repo = MagicMock()
-    mock_parser = MagicMock()
-    mock_service = MagicMock()
-    if resolve_side_effect is not None:
-        mock_service.resolve_original_resume.side_effect = resolve_side_effect
-    else:
-        mock_service.resolve_original_resume.return_value = resolved
-    if save_side_effect is not None:
-        mock_service.save_tailored_resume.side_effect = save_side_effect
-    else:
-        mock_service.save_tailored_resume.return_value = MagicMock()
+    """Patch all external collaborators needed by _tailor_impl()."""
+    cv = cv or make_cv()
+    workflow_result = make_result(cv=cv, passed=passed)
+    scraped_job = make_scraped_job()
 
     mock_workflow = MagicMock()
     mock_workflow.run = AsyncMock(return_value=workflow_result)
-    mock_generate_resume = MagicMock()
+
+    mock_generate_resume = MagicMock(return_value="/fake/output/resume.md")
+
+    if scraper_side_effect is not None:
+        mock_scraper_run = AsyncMock(side_effect=scraper_side_effect)
+    else:
+        mock_scraper_run = AsyncMock(return_value=MagicMock(output=scraped_job))
+
+    mock_repo = MagicMock()
+    mock_parser = MagicMock()
+    mock_svc = MagicMock()
+
+    resolved = MagicMock()
+    resolved.source = MagicMock(id="src-123")
+    resolved.cv = cv
+
+    if resolve_side_effect is not None:
+        mock_svc.aresolve_original_resume = AsyncMock(
+            side_effect=resolve_side_effect
+        )
+    else:
+        mock_svc.aresolve_original_resume = AsyncMock(return_value=resolved)
+
+    if save_side_effect is not None:
+        mock_svc.save_tailored_resume = MagicMock(side_effect=save_side_effect)
+    else:
+        mock_svc.save_tailored_resume = MagicMock(
+            return_value=MagicMock(id="job-456")
+        )
+
+    mocks = {
+        "workflow": mock_workflow,
+        "generate_resume": mock_generate_resume,
+        "scraper_run": mock_scraper_run,
+        "service": mock_svc,
+    }
 
     patches = [
+        patch("resume_tailorator.main.job_scraper_agent.run", mock_scraper_run),
+        patch(
+            "resume_tailorator.main.ResumeTailorWorkflow",
+            return_value=mock_workflow,
+        ),
+        patch("resume_tailorator.main.generate_resume", mock_generate_resume),
         patch(
             "resume_tailorator.main.SQLiteResumeMemoryRepository",
             return_value=mock_repo,
         ),
         patch(
-            "resume_tailorator.main.PydanticAIResumeParser", return_value=mock_parser
+            "resume_tailorator.main.PydanticAIResumeParser",
+            return_value=mock_parser,
         ),
-        patch("resume_tailorator.main.ResumeMemoryService", return_value=mock_service),
         patch(
-            "resume_tailorator.main.ResumeTailorWorkflow", return_value=mock_workflow
+            "resume_tailorator.main.ResumeMemoryService",
+            return_value=mock_svc,
         ),
-        patch("resume_tailorator.main.generate_resume", mock_generate_resume),
     ]
-    return patches, {
-        "repo": mock_repo,
-        "parser": mock_parser,
-        "service": mock_service,
-        "workflow": mock_workflow,
-        "generate_resume": mock_generate_resume,
-    }
+
+    return patches, mocks
 
 
 # ---------------------------------------------------------------------------
-# Test 1: explicit --resume-path
+# Tests
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(
-    reason="Pre-Typer API: needs rewrite for _tailor_impl() — see issue #20"
-)
-async def test_main_explicit_resume_path_wires_service_and_workflow(
+@pytest.mark.anyio
+async def test_tailor_impl_persists_result_on_success(
     tmp_path, monkeypatch, subtests
 ) -> None:
-    """main() with --resume-path should:
-    - call resolve_original_resume(path=<given path>)
-    - call workflow.run with the resolved CV
-    - call save_tailored_resume when result.passed
-    """
-    files_dir = tmp_path / "files"
-    files_dir.mkdir()
-    (files_dir / "job_posting.md").write_text("# Engineer at Acme\nPython role.")
-
+    """_tailor_impl() with valid inputs should save to memory on success."""
     resume_file = tmp_path / "resume.md"
     resume_file.write_text("# Jane Doe\nPython developer.")
 
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
     monkeypatch.chdir(tmp_path)
 
-    cv = _make_cv()
-    resolved = _make_resolved(cv=cv, path=str(resume_file))
-    workflow_result = _make_result(cv=cv, passed=True)
+    patches, mocks = _setup_mocks()
 
-    patches, mocks = _patch_all(resolved=resolved, workflow_result=workflow_result)
+    from resume_tailorator.main import _tailor_impl
 
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        await main_module.main(argv=["--resume-path", str(resume_file)])
-
-    with subtests.test("resolve called with explicit path"):
-        mocks["service"].resolve_original_resume.assert_called_once_with(
-            path=str(resume_file)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        exit_code = await _tailor_impl(
+            job_url="https://example.com/job/123",
+            resume_path=str(resume_file),
+            output_dir=str(output_dir),
+            model=None,
         )
 
-    with subtests.test("workflow.run called with resolved cv"):
-        call_kwargs = mocks["workflow"].run.call_args
-        assert call_kwargs is not None
-        # first positional arg or keyword 'original_cv'
-        called_cv = (
-            call_kwargs.args[0]
-            if call_kwargs.args
-            else call_kwargs.kwargs.get("original_cv")
-        )
-        assert called_cv == cv
+    with subtests.test("exits zero"):
+        assert exit_code == 0
 
-    with subtests.test("save_tailored_resume called once"):
+    with subtests.test("workflow.run called"):
+        mocks["workflow"].run.assert_called_once()
+
+    with subtests.test("generate_resume called"):
+        mocks["generate_resume"].assert_called_once()
+
+    with subtests.test("save_tailored_resume called"):
         mocks["service"].save_tailored_resume.assert_called_once()
 
-    with subtests.test("save_tailored_resume got correct source_id"):
-        save_kwargs = mocks["service"].save_tailored_resume.call_args.kwargs
-        assert save_kwargs["source_id"] == resolved.source.id
 
-    with subtests.test("save_tailored_resume got company_name"):
-        save_kwargs = mocks["service"].save_tailored_resume.call_args.kwargs
-        assert save_kwargs["company_name"] == "Acme Corp"
-
-    with subtests.test("save_tailored_resume got job_title"):
-        save_kwargs = mocks["service"].save_tailored_resume.call_args.kwargs
-        assert save_kwargs["job_title"] == "Software Engineer"
-
-    with subtests.test("save_tailored_resume got a non-empty job_fingerprint"):
-        save_kwargs = mocks["service"].save_tailored_resume.call_args.kwargs
-        assert save_kwargs["job_fingerprint"]
-
-    with subtests.test("repository closed after run"):
-        mocks["repo"].close.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# Test 2: no --resume-path → path=None passed to service
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(
-    reason="Pre-Typer API: needs rewrite for _tailor_impl() — see issue #20"
-)
-async def test_main_no_resume_path_passes_none_to_service(
-    tmp_path, monkeypatch, subtests
-) -> None:
-    """main() without --resume-path should call resolve_original_resume(path=None)."""
-    files_dir = tmp_path / "files"
-    files_dir.mkdir()
-    (files_dir / "job_posting.md").write_text("# Engineer at Acme\nPython role.")
-
-    monkeypatch.chdir(tmp_path)
-
-    cv = _make_cv()
-    resolved = _make_resolved(cv=cv)
-    workflow_result = _make_result(cv=cv, passed=True)
-
-    patches, mocks = _patch_all(resolved=resolved, workflow_result=workflow_result)
-
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        await main_module.main(argv=[])
-
-    with subtests.test("resolve called with path=None"):
-        mocks["service"].resolve_original_resume.assert_called_once_with(path=None)
-
-
-# ---------------------------------------------------------------------------
-# Test 3: first run — no stored resume and no path → user-facing message + exit
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(
-    reason="Pre-Typer API: needs rewrite for _tailor_impl() — see issue #20"
-)
-async def test_main_first_run_no_original_resume_exits_cleanly(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    """main() must print a user-friendly warning and exit 1 on MissingOriginalResumeError.
-
-    It must NOT let the raw exception propagate as an unhandled traceback.
-    """
-    files_dir = tmp_path / "files"
-    files_dir.mkdir()
-    (files_dir / "job_posting.md").write_text("# Engineer\nPython.")
-
-    monkeypatch.chdir(tmp_path)
-
-    error = MissingOriginalResumeError(
-        "No original resume found. Please provide a path with --resume-path."
-    )
-
-    patches, mocks = _patch_all(
-        resolved=_make_resolved(),
-        workflow_result=_make_result(),
-        resolve_side_effect=error,
-    )
-
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        with pytest.raises(SystemExit) as exc_info:
-            await main_module.main(argv=[])
-
-    assert exc_info.value.code == 1
-
-    output = capsys.readouterr().out
-    assert "resume" in output.lower() or "⚠️" in output, (
-        f"Expected a user-facing warning in stdout, got: {output!r}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Test 4: FileNotFoundError from service → user-facing message + exit
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(
-    reason="Pre-Typer API: needs rewrite for _tailor_impl() — see issue #20"
-)
-async def test_main_file_not_found_exits_cleanly(tmp_path, monkeypatch, capsys) -> None:
-    """main() must handle FileNotFoundError from the service gracefully."""
-    files_dir = tmp_path / "files"
-    files_dir.mkdir()
-    (files_dir / "job_posting.md").write_text("# Engineer\nPython.")
-
-    monkeypatch.chdir(tmp_path)
-
-    patches, mocks = _patch_all(
-        resolved=_make_resolved(),
-        workflow_result=_make_result(),
-        resolve_side_effect=FileNotFoundError("No such file: /no/such/file.md"),
-    )
-
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        with pytest.raises(SystemExit) as exc_info:
-            await main_module.main(argv=["--resume-path", "/no/such/file.md"])
-
-    assert exc_info.value.code == 1
-    output = capsys.readouterr().out
-    assert "⚠️" in output or "not found" in output.lower()
-
-
-@pytest.mark.skip(
-    reason="Pre-Typer API: needs rewrite for _tailor_impl() — see issue #20"
-)
-async def test_main_resume_resolution_failure_exits_cleanly(
-    tmp_path, monkeypatch, capsys
-) -> None:
-    """Domain errors during original resume resolution must be user-facing."""
-    files_dir = tmp_path / "files"
-    files_dir.mkdir()
-    (files_dir / "job_posting.md").write_text("# Engineer\nPython.")
-
-    monkeypatch.chdir(tmp_path)
-
-    patches, mocks = _patch_all(
-        resolved=_make_resolved(),
-        workflow_result=_make_result(),
-        resolve_side_effect=ResumeMemoryError("corrupted cached CV"),
-    )
-
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        with pytest.raises(SystemExit) as exc_info:
-            await main_module.main(argv=[])
-
-    assert exc_info.value.code == 1
-    output = capsys.readouterr().out
-    assert "failed to resolve original resume" in output.lower()
-    mocks["workflow"].run.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# Test 5: result.passed=False → save_tailored_resume NOT called
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(
-    reason="Pre-Typer API: needs rewrite for _tailor_impl() — see issue #20"
-)
-async def test_main_failed_audit_does_not_save_tailored_resume(
+@pytest.mark.anyio
+async def test_tailor_impl_failed_audit_persists_record(
     tmp_path, monkeypatch
 ) -> None:
-    """When the workflow result.passed is False, save_tailored_resume must not be called."""
-    files_dir = tmp_path / "files"
-    files_dir.mkdir()
-    (files_dir / "job_posting.md").write_text("# Engineer\nPython.")
+    """Save record even when audit fails (for re-tailoring), but skip resume file."""
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe\nPython developer.")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
 
     monkeypatch.chdir(tmp_path)
 
-    cv = _make_cv()
-    resolved = _make_resolved(cv=cv)
-    workflow_result = _make_result(cv=cv, passed=False)
+    patches, mocks = _setup_mocks(passed=False)
 
-    patches, mocks = _patch_all(resolved=resolved, workflow_result=workflow_result)
+    from resume_tailorator.main import _tailor_impl
 
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        await main_module.main(argv=[])
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        exit_code = await _tailor_impl(
+            job_url="https://example.com/job/123",
+            resume_path=str(resume_file),
+            output_dir=str(output_dir),
+            model=None,
+        )
 
-    mocks["service"].save_tailored_resume.assert_not_called()
+    assert exit_code == 0
+    mocks["workflow"].run.assert_called_once()
+    mocks["service"].save_tailored_resume.assert_called_once()
+    mocks["generate_resume"].assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# Test 6: save_tailored_resume failure → user-facing message + exit
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(
-    reason="Pre-Typer API: needs rewrite for _tailor_impl() — see issue #20"
-)
-async def test_main_save_tailored_resume_failure_exits_cleanly(
-    tmp_path, monkeypatch, capsys
+@pytest.mark.anyio
+async def test_tailor_impl_save_failure_handled_gracefully(
+    tmp_path, monkeypatch
 ) -> None:
-    """A persistence failure must stop the run with a user-facing message."""
-    files_dir = tmp_path / "files"
-    files_dir.mkdir()
-    (files_dir / "job_posting.md").write_text("# Engineer\nPython.")
+    """Warn and continue when save_tailored_resume fails."""
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe\nPython developer.")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
 
     monkeypatch.chdir(tmp_path)
 
-    cv = _make_cv()
-    resolved = _make_resolved(cv=cv)
-    workflow_result = _make_result(cv=cv, passed=True)
+    patches, mocks = _setup_mocks(save_side_effect=Exception("disk full"))
 
-    patches, mocks = _patch_all(
-        resolved=resolved,
-        workflow_result=workflow_result,
-        save_side_effect=ResumeMemoryError("disk full"),
+    from resume_tailorator.main import _tailor_impl
+
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        exit_code = await _tailor_impl(
+            job_url="https://example.com/job/123",
+            resume_path=str(resume_file),
+            output_dir=str(output_dir),
+            model=None,
+        )
+
+    assert exit_code == 0
+    mocks["workflow"].run.assert_called_once()
+    mocks["generate_resume"].assert_called_once()
+    mocks["service"].save_tailored_resume.assert_called_once()
+
+
+@pytest.mark.anyio
+async def test_tailor_impl_cache_hit_reuses_pre_parsed_cv(
+    tmp_path, monkeypatch
+) -> None:
+    """When memory service returns a cached CV, pass it to the workflow."""
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe\nPython developer.")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    monkeypatch.chdir(tmp_path)
+
+    cv = make_cv(full_name="Cached Jane")
+    patches, mocks = _setup_mocks(cv=cv)
+
+    from resume_tailorator.main import _tailor_impl
+
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        await _tailor_impl(
+            job_url="https://example.com/job/123",
+            resume_path=str(resume_file),
+            output_dir=str(output_dir),
+            model=None,
+        )
+
+    call_kwargs = mocks["workflow"].run.call_args.kwargs
+    assert call_kwargs.get("pre_parsed_cv") == cv
+
+
+@pytest.mark.anyio
+async def test_tailor_impl_cache_miss_falls_back_to_ai_parsing(
+    tmp_path, monkeypatch
+) -> None:
+    """When memory service raises, pre_parsed_cv should be None (fallback to AI)."""
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe\nPython developer.")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    monkeypatch.chdir(tmp_path)
+
+    patches, mocks = _setup_mocks(
+        resolve_side_effect=Exception("DB connection lost")
     )
 
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        with pytest.raises(SystemExit) as exc_info:
-            await main_module.main(argv=[])
+    from resume_tailorator.main import _tailor_impl
 
-    assert exc_info.value.code == 1
-    output = capsys.readouterr().out
-    assert "failed to save tailored resume" in output.lower()
-    mocks["generate_resume"].assert_not_called()
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        await _tailor_impl(
+            job_url="https://example.com/job/123",
+            resume_path=str(resume_file),
+            output_dir=str(output_dir),
+            model=None,
+        )
+
+    mocks["workflow"].run.assert_called_once()
+    call_kwargs = mocks["workflow"].run.call_args.kwargs
+    assert call_kwargs.get("pre_parsed_cv") is None
+
+
+@pytest.mark.anyio
+async def test_tailor_impl_invalid_url_exits(tmp_path, monkeypatch) -> None:
+    """Reject non-http(s) URLs with TyperExit."""
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("# Jane Doe\nPython developer.")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    monkeypatch.chdir(tmp_path)
+
+    from resume_tailorator.main import _tailor_impl
+
+    with pytest.raises(TyperExit):
+        await _tailor_impl(
+            job_url="not-a-url",
+            resume_path=str(resume_file),
+            output_dir=str(output_dir),
+            model=None,
+        )
+
+
+@pytest.mark.anyio
+async def test_tailor_impl_empty_resume_content_exits(
+    tmp_path, monkeypatch
+) -> None:
+    """Reject empty resume content with TyperExit."""
+    resume_file = tmp_path / "resume.md"
+    resume_file.write_text("")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    monkeypatch.chdir(tmp_path)
+
+    from resume_tailorator.main import _tailor_impl
+
+    with pytest.raises(TyperExit):
+        await _tailor_impl(
+            job_url="https://example.com/job/123",
+            resume_path=str(resume_file),
+            output_dir=str(output_dir),
+            model=None,
+        )
