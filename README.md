@@ -1,4 +1,4 @@
-#  📄 Resume Tailorator
+# 📄 Resume Tailorator
 
 ![cover](./cover.png)
 
@@ -28,11 +28,11 @@ The system runs a sequential pipeline with an inner refinement loop:
 
 **Stages 3–5 — Write → Review → Audit Loop** (outer loop, up to 3 write attempts):
 
-| Stage | Agent | Description |
-|-------|-------|-------------|
-| 3. Write | CV Writer | Tailors the CV to match job requirements → Quality gate validates tailoring |
-| 4. Review | Reviewer | Scores CV quality and suggests improvements; triggers refinement loop (up to 3 review iterations per write attempt) |
-| 5. Audit | Auditor | Checks for hallucinations and AI clichés → Quality gate validates audit quality. If audit fails, the entire Write → Review → Audit loop retries from stage 3. |
+| Stage     | Agent     | Description                                                                                                                                                   |
+| --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3. Write  | CV Writer | Tailors the CV to match job requirements → Quality gate validates tailoring                                                                                   |
+| 4. Review | Reviewer  | Scores CV quality and suggests improvements; triggers refinement loop (up to 3 review iterations per write attempt)                                           |
+| 5. Audit  | Auditor   | Checks for hallucinations and AI clichés → Quality gate validates audit quality. If audit fails, the entire Write → Review → Audit loop retries from stage 3. |
 
 **Stage 6 — Report Generator**: Compiles a self-review report with CVDiff, gap analysis, and recommendations.
 
@@ -44,11 +44,12 @@ The system runs a sequential pipeline with an inner refinement loop:
 
 - **Python 3.13+**
 - **[uv](https://github.com/astral-sh/uv)** (Fast Python package installer and resolver)
-- **OpenAI API Key** (or compatible LLM provider configured in environment)
+- **LLM Provider API Key** — OpenAI by default; many providers supported (see [LLM Providers](#-llm-providers))
 
 ## 📦 Installation
 
 1.  **Clone the repository**:
+
     ```bash
     git clone https://github.com/EmadMokhtar/resume_tailorator
     cd resume_tailorator
@@ -56,15 +57,70 @@ The system runs a sequential pipeline with an inner refinement loop:
 
 2.  **Install dependencies**:
     This project uses `uv` for dependency management.
+
     ```bash
     uv sync
     ```
 
 3.  **Set up Environment Variables**:
-    Export your OpenAI API key:
+    Export your API key for the LLM provider you plan to use:
+
     ```bash
+    # OpenAI (default)
     export OPENAI_API_KEY=your_api_key_here
+
+    # Other providers — see the LLM Providers section below
+    # export ANTHROPIC_API_KEY=...
+    # export GOOGLE_API_KEY=...
+    # export GROQ_API_KEY=...
+    # export MISTRAL_API_KEY=...
     ```
+
+## 🤖 LLM Providers
+
+Resume Tailorator is built on [PydanticAI](https://ai.pydantic.dev), which supports a wide range of LLM providers. You select a provider and model via the `--model` CLI option using the format **`<provider>:<model>`**.
+
+The default model is `openai:gpt-5-mini`. To use a different provider or model, pass `--model` with the appropriate prefix:
+
+```bash
+uv run resume-tailor tailor <JOB_URL> <RESUME_PATH> --model anthropic:claude-sonnet-4-5
+```
+
+### Supported Providers
+
+| Provider                                                       | Prefix          | Example `--model`                     | Required Env Var     |
+| -------------------------------------------------------------- | --------------- | ------------------------------------- | -------------------- |
+| [OpenAI](https://platform.openai.com)                          | `openai:`       | `openai:gpt-4o-mini`                  | `OPENAI_API_KEY`     |
+| [Anthropic](https://console.anthropic.com)                     | `anthropic:`    | `anthropic:claude-sonnet-4-5`         | `ANTHROPIC_API_KEY`  |
+| [Google Gemini](https://aistudio.google.com)                   | `google:`       | `google:gemini-3-pro-preview`         | `GOOGLE_API_KEY`     |
+| [Google Cloud (Vertex AI)](https://cloud.google.com/vertex-ai) | `google-cloud:` | `google-cloud:gemini-3-flash-preview` | `GOOGLE_API_KEY`     |
+| [Groq](https://console.groq.com)                               | `groq:`         | `groq:llama-3.3-70b-versatile`        | `GROQ_API_KEY`       |
+| [Mistral](https://console.mistral.ai)                          | `mistral:`      | `mistral:mistral-large-latest`        | `MISTRAL_API_KEY`    |
+| [xAI](https://x.ai/api)                                        | `xai:`          | `xai:grok-3-mini`                     | `XAI_API_KEY`        |
+| [Cohere](https://dashboard.cohere.com)                         | `cohere:`       | `cohere:command-r-plus`               | `COHERE_API_KEY`     |
+| [DeepSeek](https://platform.deepseek.com)                      | `deepseek:`     | `deepseek:deepseek-chat`              | `DEEPSEEK_API_KEY`   |
+| [OpenRouter](https://openrouter.ai)                            | `openrouter:`   | `openrouter:openai/gpt-4o`            | `OPENROUTER_API_KEY` |
+| [Ollama](https://ollama.com) (local)                           | `ollama:`       | `ollama:llama3`                       | _(none — local)_     |
+| [GitHub Models](https://github.com/marketplace/models)         | `github:`       | `github:xai/grok-3-mini`              | `GITHUB_API_KEY`     |
+| [Cerebras](https://cloud.cerebras.ai)                          | `cerebras:`     | `cerebras:llama3.1-8b`                | `CEREBRAS_API_KEY`   |
+| [AWS Bedrock](https://aws.amazon.com/bedrock)                  | `bedrock:`      | `bedrock:anthropic.claude-sonnet-4-5` | AWS credentials      |
+
+> **💡 Tip:** PydanticAI resolves the model class, provider, and profile automatically from the `<provider>:<model>` string. You don't need to install extra packages — `pydantic-ai` ships with support for all built-in providers.
+
+### Using a Local Model (Ollama)
+
+To use a locally running model via [Ollama](https://ollama.com), make sure Ollama is running and the model is pulled:
+
+```bash
+ollama pull llama3
+uv run resume-tailor tailor <JOB_URL> <RESUME_PATH> --model ollama:llama3
+```
+
+> **⚠️ Note:** Local models may be slower or produce less reliable structured output than cloud providers. The quality gates and retries help compensate, but for production use a cloud provider is recommended.
+
+### OpenAI-Compatible Providers
+
+Many providers offer OpenAI-compatible APIs. PydanticAI supports these via the `openai:` prefix combined with provider-specific routing environment variables. See the [PydanticAI OpenAI docs](https://ai.pydantic.dev/models/openai/) for details on [Together AI](https://ai.pydantic.dev/models/openai/#together-ai), [Perplexity](https://ai.pydantic.dev/models/openai/#perplexity), [Fireworks AI](https://ai.pydantic.dev/models/openai/#fireworks-ai), [Azure AI Foundry](https://ai.pydantic.dev/models/openai/#azure-ai-foundry), and more.
 
 ## 🏃 Usage
 
@@ -77,12 +133,14 @@ uv run resume-tailor tailor <JOB_URL> <RESUME_PATH> [OPTIONS]
 ```
 
 **Arguments:**
+
 - `JOB_URL` — URL of the job posting (must start with `http://` or `https://`)
 - `RESUME_PATH` — Path to your resume (`.md`, `.docx`, or `.pdf`)
 
 **Options:**
+
 - `--output-dir PATH` — Output directory (default: `./output`)
-- `--model MODEL` — AI model override (default: `openai:gpt-5-mini`)
+- `--model MODEL` — LLM provider and model in `provider:model` format (default: `openai:gpt-5-mini`). See [LLM Providers](#-llm-providers) for all supported options.
 - `--verbose` / `-v` — Stream agent thinking and prompts in real-time
 - `--debug` / `-d` — Enable debug output and save the converted resume markdown
 - `--output-pattern TEMPLATE` — Template for job-specific subdirectory name (default: `{company_name}-{job_title}`)
@@ -104,10 +162,12 @@ uv run resume-tailor re-tailor <JOB_ID> <RECOMMENDATIONS> [OPTIONS]
 ```
 
 **Arguments:**
+
 - `JOB_ID` — UUID of the prior job (shown in output after a `tailor` run)
 - `RECOMMENDATIONS` — Comments or recommendations from the prior audit report
 
 **Options:**
+
 - `--resume-path PATH` — Resume path (uses the stored path from the prior job if omitted)
 - `--output-dir PATH` — Output directory (default: `./output`)
 - `--model MODEL` — AI model override
@@ -140,11 +200,13 @@ uv run python resume_tailorator/main.py tailor <JOB_URL> <RESUME_PATH>
 Upon successful completion, output files are saved in job-specific subdirectories under `output/` (or the path specified via `--output-dir`). The subdirectory name follows the `--output-pattern` template (default: `{company_name}-{job_title}`).
 
 Three resume formats are generated per run:
+
 - `.md` — Markdown (source format)
 - `.pdf` — PDF (converted from Markdown)
 - `.docx` — DOCX (converted from Markdown)
 
 A comprehensive self-review report is also generated:
+
 - `_report.md` — Markdown report with match score, gap analysis, and recommendations
 
 Example structure for a job at Acme Corp for a Senior Engineer role:
@@ -193,9 +255,9 @@ The system includes built-in quality validation for every agent:
 
 ## 🛠️ Make Commands
 
-| Command            | Description                                          |
-|--------------------|------------------------------------------------------|
-| `make help`        | Show available commands and descriptions.            |
+| Command            | Description                                           |
+| ------------------ | ----------------------------------------------------- |
+| `make help`        | Show available commands and descriptions.             |
 | `make install`     | Install production dependencies using `uv`.           |
 | `make install/dev` | Install development dependencies using `uv`.          |
 | `make test`        | Run the full test suite using `pytest`.               |

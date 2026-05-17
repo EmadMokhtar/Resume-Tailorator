@@ -299,14 +299,14 @@ Entry point: `resume_tailorator/main.py` — Typer app, console script `resume-t
 uv run resume-tailor tailor JOB_URL RESUME_PATH [OPTIONS]
 ```
 
-| Option                  | Type | Default                      | Description                                    |
-| ----------------------- | ---- | ---------------------------- | ---------------------------------------------- |
-| `--output-dir`          | PATH | `./output`                   | Output directory                               |
-| `--model`               | TEXT | `None`                       | AI model override (e.g., `openai:gpt-4o-mini`) |
-| `--verbose` / `-v`      | FLAG | `False`                      | Stream agent thinking in real-time             |
-| `--debug` / `-d`        | FLAG | `False`                      | Save converted resume, show content hashes     |
-| `--output-pattern`      | TEXT | `{company_name}-{job_title}` | Subdirectory name template                     |
-| `--resume-name-pattern` | TEXT | `{company_name}-{full_name}` | Resume file base name template                 |
+| Option                  | Type | Default                      | Description                                                       |
+| ----------------------- | ---- | ---------------------------- | ----------------------------------------------------------------- |
+| `--output-dir`          | PATH | `./output`                   | Output directory                                                  |
+| `--model`               | TEXT | `None`                       | LLM provider:model override (e.g., `anthropic:claude-sonnet-4-5`) |
+| `--verbose` / `-v`      | FLAG | `False`                      | Stream agent thinking in real-time                                |
+| `--debug` / `-d`        | FLAG | `False`                      | Save converted resume, show content hashes                        |
+| `--output-pattern`      | TEXT | `{company_name}-{job_title}` | Subdirectory name template                                        |
+| `--resume-name-pattern` | TEXT | `{company_name}-{full_name}` | Resume file base name template                                    |
 
 Template variables: `{company_name}`, `{job_title}`, `{full_name}`, `{timestamp}`
 
