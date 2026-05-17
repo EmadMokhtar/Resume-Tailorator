@@ -29,16 +29,25 @@ jobs:
         run: uv sync --dev
 
       - name: Bump version and update changelog
+        id: bump
         run: |
-          uv run cz bump --yes --files-only
+          uv run cz --no-raise 21 bump --yes --files-only
+          if git diff --quiet -- pyproject.toml; then
+            echo "No bump-eligible commits found — skipping release"
+            echo "BUMP_NEEDED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "BUMP_NEEDED=true" >> "$GITHUB_ENV"
           NEW_VERSION=$(uv run cz version --project)
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          echo "BRANCH=release/v$NEW_VERSION" >> $GITHUB_ENV
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+          echo "BRANCH=release/v$NEW_VERSION" >> "$GITHUB_ENV"
 
       - name: Extract changelog body
+        if: env.BUMP_NEEDED == 'true'
         run: awk '/^## /{if(++c>1)exit} {print}' CHANGELOG.md > body.md
 
       - name: Push to release branch and create PR
+        if: env.BUMP_NEEDED == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -79,7 +88,7 @@ jobs:
       - name: Get version and create tag
         run: |
           VERSION=$(uv run cz version --project)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           git tag "v$VERSION"
           git push origin "v$VERSION"
 
